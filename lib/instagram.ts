@@ -8,7 +8,7 @@ export function urlDeAutorizacao(state: string) {
     config_id: process.env.INSTAGRAM_CONFIG_ID!,
     redirect_uri: redirectUri(),
     response_type: "code",
-    scope: "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement",
+    scope: "instagram_basic,instagram_content_publish,pages_show_list",
     state,
   });
   return `https://www.facebook.com/dialog/oauth?${p}`;
