@@ -10,7 +10,7 @@ const id = (f: FormData) => String(f.get("id") ?? "");
 export async function aprovarPost(f: FormData) {
   const s = await supabaseDoUsuario();
   await s.from("posts").update({ status: "aprovado" })
-    .eq("id", id(f)).in("status", ["aguardando_aprovacao", "recusado"]);
+    .eq("id", id(f)).in("status", ["aguardando_aprovacao", "recusado", "erro"]);
   revalidatePath("/painel");
 }
 

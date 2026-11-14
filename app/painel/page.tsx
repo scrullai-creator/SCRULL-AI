@@ -30,7 +30,7 @@ const AVISOS: Record<string, [string, boolean]> = {
 
 const STATUS: Record<string, [string, string]> = {
   aguardando_aprovacao: ["Aguardando você", ""],
-  aprovado: ["Aprovado", "ok"],
+  aprovado: ["Aprovado: sai na hora marcada", "ok"],
   recusado: ["Recusado", "cinza"],
   publicado: ["Publicado", "ok"],
   erro: ["Erro ao publicar", ""],
@@ -177,7 +177,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
             )}
             {posts.map((p) => {
               const [rotulo, cor] = STATUS[p.status] ?? [p.status, ""];
-              const editavel = p.status === "aguardando_aprovacao" || p.status === "aprovado" || p.status === "recusado";
+              const editavel = ["aguardando_aprovacao", "aprovado", "recusado", "erro"].includes(p.status);
               return (
                 <div className="card post" key={p.id} id={`post-${p.id}`}>
                   <div className="arte">
