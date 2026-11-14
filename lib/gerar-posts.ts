@@ -29,7 +29,12 @@ export async function criarPosts(a: {
       messages: [{ role: "user", content: prompt }],
     }),
   });
-  if (!res.ok) throw new Error(`A IA respondeu com erro ${res.status}`);
+  if (!res.ok) {
+    // Registra o motivo que a API informou (não contém a chave) para facilitar o diagnóstico
+    const erro = await res.json().catch(() => null);
+    console.error("Anthropic API erro:", res.status, erro?.error?.type ?? "", erro?.error?.message ?? "");
+    throw new Error(`A IA respondeu com erro ${res.status}`);
+  }
 
   const j = await res.json();
   const texto = (j.content ?? []).map((b: any) => b.text ?? "").join("");
