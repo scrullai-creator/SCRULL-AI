@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost } from "./gerar";
+import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgora } from "./gerar";
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
 import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
@@ -15,6 +15,9 @@ const AVISOS: Record<string, [string, boolean]> = {
   "ger-erro": ["Não foi possível criar os posts agora. Tente de novo em instantes.", false],
   "img-ok": ["Arte criada! Se não gostar, é só gerar outra.", true],
   "img-erro": ["Não foi possível criar a arte agora. Tente de novo em instantes.", false],
+  "pub-ok": ["Post publicado no Instagram!", true],
+  "pub-erro": ["Não foi possível publicar agora. Veja o motivo no post e tente de novo.", false],
+  "pub-assine": ["Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.", false],
   "demo-usada": ["Sua semana grátis já foi criada. Assine para criar novas semanas, liberar todas as artes e publicar.", false],
   "img-limite": [`Limite de artes atingido: cada post pode ter até ${ARTES_POR_POST} artes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
   "perfil-ok": ["Briefing salvo! Agora a Scrull conhece a sua marca.", true],
@@ -204,6 +207,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                           assinante
                             ? <span className="badge cinza">Limite de artes deste post</span>
                             : <span className="assine">Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.</span>
+                        )}
+                        {assinante && conta && p.imagem_url && (
+                          <form action={publicarAgora}><input type="hidden" name="id" value={p.id} /><button className="btn sm ig-agora">Publicar agora</button></form>
                         )}
                         {p.status !== "aprovado" && (
                           <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><button className="btn sm">Aprovar</button></form>

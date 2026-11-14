@@ -5,6 +5,7 @@ import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
 import { criarPosts } from "@/lib/gerar-posts";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
 import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
+import { publicarPost } from "@/lib/publicar";
 
 const HORAS = ["19:00", "12:00", "11:30", "18:30", "19:00", "12:30", "19:00"];
 
@@ -142,6 +143,27 @@ export async function gerarImagemPost(f: FormData) {
     } else {
       console.error("Erro ao gerar imagem:", e);
     }
+  }
+  revalidatePath("/painel");
+  redirect(`/painel?ig=${resultado}#post-${id}`);
+}
+
+// Publicar agora no Instagram (só assinantes) -------------------------------
+export async function publicarAgora(f: FormData) {
+  const { user } = await usuarioLogado();
+  const id = String(f.get("id") ?? "");
+  let resultado = "pub-erro";
+  try {
+    const db = supabaseAdmin();
+    const { data: c } = await db.from("clientes").select("assinatura").eq("id", user.id).single();
+    if (c?.assinatura !== "ativa") {
+      resultado = "pub-assine";
+    } else {
+      await publicarPost(id, user.id);
+      resultado = "pub-ok";
+    }
+  } catch (e) {
+    console.error("Erro ao publicar:", e);
   }
   revalidatePath("/painel");
   redirect(`/painel?ig=${resultado}#post-${id}`);
