@@ -3,6 +3,32 @@ const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-haiku-5-5";
 
 export type PostGerado = { titulo: string; legenda: string; hashtags: string[] };
 
+// A IA às vezes escreve algo antes ou depois do JSON, ou é cortada no meio.
+// Fica só com o array e, se ele vier cortado, aproveita os posts completos.
+export function extrairLista(texto: string): unknown[] | null {
+  const inicio = texto.indexOf("[");
+  if (inicio < 0) return null;
+  const tentar = (t: string) => {
+    try {
+      const v = JSON.parse(t);
+      return Array.isArray(v) ? v : null;
+    } catch {
+      return null;
+    }
+  };
+  const fim = texto.lastIndexOf("]");
+  const inteira = fim > inicio ? tentar(texto.slice(inicio, fim + 1)) : null;
+  if (inteira) return inteira;
+  // Resposta cortada: recua até o último post que fechou certinho
+  let corte = texto.lastIndexOf("}");
+  while (corte > inicio) {
+    const parcial = tentar(texto.slice(inicio, corte + 1) + "]");
+    if (parcial) return parcial;
+    corte = texto.lastIndexOf("}", corte - 1);
+  }
+  return null;
+}
+
 export async function criarPosts(a: {
   empresa: string; ramo: string; tom: string; quantidade: number;
 }): Promise<PostGerado[]> {
@@ -25,7 +51,7 @@ export async function criarPosts(a: {
     },
     body: JSON.stringify({
       model: MODELO,
-      max_tokens: 1800,
+      max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -38,13 +64,9 @@ export async function criarPosts(a: {
 
   const j = await res.json();
   const texto = (j.content ?? []).map((b: any) => b.text ?? "").join("");
-  // A IA às vezes escreve algo antes ou depois do JSON: fica só com o array
-  const inicio = texto.indexOf("[");
-  const fim = texto.lastIndexOf("]");
-  let lista: unknown;
-  try {
-    lista = JSON.parse(inicio >= 0 && fim > inicio ? texto.slice(inicio, fim + 1) : texto.trim());
-  } catch {
+  const lista = extrairLista(texto);
+  if (!lista) {
+    console.error("Resposta da IA fora do formato. stop_reason:", j.stop_reason, "tamanho:", texto.length);
     throw new Error("A IA devolveu uma resposta inválida");
   }
   if (!Array.isArray(lista) || !lista.length) throw new Error("Resposta da IA fora do formato");
