@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost } from "./gerar";
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
-import { ARTES_POR_POST, contarArtes } from "@/lib/imagem";
+import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
 import { aprovarPost, recusarPost, aprovarTodos, salvarLegenda, alternarConfig, sair } from "./actions";
 
 // Gerar a arte pode levar até ~40 s
@@ -15,6 +15,7 @@ const AVISOS: Record<string, [string, boolean]> = {
   "ger-erro": ["Não foi possível criar os posts agora. Tente de novo em instantes.", false],
   "img-ok": ["Arte criada! Se não gostar, é só gerar outra.", true],
   "img-erro": ["Não foi possível criar a arte agora. Tente de novo em instantes.", false],
+  "demo-usada": ["Sua semana grátis já foi criada. Assine para criar novas semanas, liberar todas as artes e publicar.", false],
   "img-limite": [`Limite de artes atingido: cada post pode ter até ${ARTES_POR_POST} artes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
   "perfil-ok": ["Briefing salvo! Agora a Scrull conhece a sua marca.", true],
   "perfil-erro": ["Não foi possível salvar o briefing. Tente de novo.", false],
@@ -64,13 +65,11 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
 
   const conta = contas?.[0];
   const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
-  const artes = posts?.some((p) => p.imagem_url) ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
+  const artes = posts?.length ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
   const aviso = ig ? AVISOS[ig] : undefined;
   const briefing = lerBriefing(cliente?.briefing);
   const briefingPreenchido = Object.keys(briefing).length > 0;
-  const diasTeste = cliente?.assinatura === "teste"
-    ? Math.max(0, Math.ceil((new Date(cliente.teste_ate).getTime() - Date.now()) / 86400000))
-    : null;
+  const assinante = cliente?.assinatura === "ativa";
   const quando = (iso: string) =>
     new Date(iso).toLocaleString("pt-BR", {
       weekday: "short", day: "2-digit", month: "2-digit",
@@ -88,7 +87,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
       <main>
         <h1>Olá, {cliente?.nome_empresa ?? "bem-vinda"}!</h1>
         <p className="sub">
-          {diasTeste !== null ? `Seu teste grátis termina em ${diasTeste} ${diasTeste === 1 ? "dia" : "dias"}.` : "Sua assinatura está ativa."}
+          {assinante ? "Sua assinatura está ativa." : `Demonstração grátis: crie sua primeira semana de posts e veja ${ARTES_DEMO} artes. Assine para publicar.`}
         </p>
 
         {aviso && <div className={`aviso ${aviso[1] ? "ok" : ""}`} role="status">{aviso[0]}</div>}
@@ -108,7 +107,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
           )}
         </div>
 
-        {conta && (
+        {(
           <>
             <h2>Sua marca</h2>
             <details className="card" open={!cliente?.ramo || !briefingPreenchido}>
@@ -143,22 +142,22 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
         )}
 
         <h2>Posts da semana</h2>
-        {conta && cliente?.ramo && (
+        {cliente?.ramo && (
           <div className="acoes" style={{ marginBottom: 14 }}>
             {!posts?.length ? (
-              <form action={gerarSemana}><button className="btn">Criar posts da semana</button></form>
-            ) : (
+              <form action={gerarSemana}><button className="btn">{assinante ? "Criar posts da semana" : "Criar minha semana grátis"}</button></form>
+            ) : assinante ? (
               <form action={refazerSemana}>
                 <button className="btn ghost">Refazer a semana</button>
                 <small className="dica" style={{ marginLeft: 8 }}>Apaga os posts não aprovados e cria outros.</small>
               </form>
-            )}
+            ) : null}
           </div>
         )}
         {!posts?.length ? (
           <div className="card">
             <p style={{ margin: 0 }}>
-              {conta ? "Ainda não há posts agendados. Preencha o briefing e clique em \"Criar posts da semana\"." : "Conecte o Instagram para a Scrull começar a criar seus posts."}
+              {cliente?.ramo ? "Ainda não há posts. Clique no botão acima e a Scrull cria a sua semana." : "Preencha o briefing da marca acima para a Scrull começar a criar seus posts."}
             </p>
           </div>
         ) : (
@@ -194,15 +193,15 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                     {p.erro_msg && <p className="erro">{p.erro_msg}</p>}
                     {editavel && (
                       <div className="acoes">
-                        {(artes.porPost[p.id] ?? 0) < ARTES_POR_POST ? (
+                        {(assinante ? (artes.porPost[p.id] ?? 0) < ARTES_POR_POST : artes.noMes < ARTES_DEMO) ? (
                           <form action={gerarImagemPost}>
                             <input type="hidden" name="id" value={p.id} />
                             <button className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>
-                              {p.imagem_url ? `Gerar outra arte (${ARTES_POR_POST - (artes.porPost[p.id] ?? 0)} restantes)` : "Criar arte"}
+                              {p.imagem_url ? `Gerar outra arte (${assinante ? ARTES_POR_POST - (artes.porPost[p.id] ?? 0) : ARTES_DEMO - artes.noMes} restantes)` : "Criar arte"}
                             </button>
                           </form>
                         ) : (
-                          <span className="badge cinza">Limite de artes deste post</span>
+                          <span className="badge cinza">{assinante ? "Limite de artes deste post" : "Assine para criar mais artes"}</span>
                         )}
                         {p.status !== "aprovado" && (
                           <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><button className="btn sm">Aprovar</button></form>

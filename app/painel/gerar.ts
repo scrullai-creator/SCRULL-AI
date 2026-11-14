@@ -55,10 +55,17 @@ export async function salvarPerfil(f: FormData) {
 // Posts da semana -----------------------------------------------------------
 async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
   const { data: cliente } = await db.from("clientes")
-    .select("nome_empresa, ramo, tom_de_voz, plano_id, briefing, logo_url").eq("id", userId).single();
+    .select("nome_empresa, ramo, tom_de_voz, plano_id, briefing, logo_url, assinatura").eq("id", userId).single();
+  if (!cliente?.ramo) throw new Error("Perfil incompleto");
+  // O Instagram só é obrigatório para publicar; a demonstração funciona sem ele
   const { data: conta } = await db.from("contas_instagram").select("id")
     .eq("cliente_id", userId).eq("ativa", true).limit(1).maybeSingle();
-  if (!cliente?.ramo || !conta) throw new Error("Perfil incompleto");
+
+  // Demonstração: quem ainda não assinou cria uma semana só
+  if (cliente.assinatura !== "ativa") {
+    const { count: jaCriou } = await db.from("posts").select("id", { count: "exact", head: true }).eq("cliente_id", userId);
+    if ((jaCriou ?? 0) > 0) return "demo-usada";
+  }
 
   // Economia: no máximo uma geração a cada 12 horas por cliente (posts recusados não contam)
   const desde = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
@@ -82,7 +89,7 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
   const status = cfg?.postar_sem_aprovacao ? "aprovado" : "aguardando_aprovacao";
   const { error } = await db.from("posts").insert(
     lista.map((p, i) => ({
-      cliente_id: userId, conta_id: conta.id, titulo_arte: p.titulo, topicos: p.topicos, tema: p.tema,
+      cliente_id: userId, conta_id: conta?.id ?? null, titulo_arte: p.titulo, topicos: p.topicos, tema: p.tema,
       legenda: p.legenda, hashtags: p.hashtags, prompt_imagem: p.prompt_imagem,
       agendado_para: horario(1 + i * passo, HORAS[i % HORAS.length]), status,
     }))
@@ -108,8 +115,13 @@ export async function refazerSemana() {
   let resultado = "ger-erro";
   try {
     const db = supabaseAdmin();
-    await db.from("posts").delete().eq("cliente_id", user.id).in("status", ["aguardando_aprovacao", "recusado"]);
-    resultado = await gerar(user.id, db);
+    const { data: c } = await db.from("clientes").select("assinatura").eq("id", user.id).single();
+    if (c?.assinatura !== "ativa") {
+      resultado = "demo-usada";
+    } else {
+      await db.from("posts").delete().eq("cliente_id", user.id).in("status", ["aguardando_aprovacao", "recusado"]);
+      resultado = await gerar(user.id, db);
+    }
   } catch (e) {
     console.error("Erro ao refazer posts:", e);
   }

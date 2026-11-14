@@ -72,6 +72,8 @@ export async function guardarArquivo(caminho: string, bytes: Buffer | ArrayBuffe
 // até 3 artes por post e, por mês, 2 artes por post previsto no plano.
 export const ARTES_POR_POST = Number(process.env.LIMITE_ARTES_POR_POST ?? 3);
 const ARTES_POR_POST_NO_MES = 2;
+// Quem ainda não assinou (demonstração) pode criar só estas artes, no total
+export const ARTES_DEMO = Number(process.env.LIMITE_ARTES_DEMO ?? 2);
 
 export class LimiteDeArtes extends Error {}
 
@@ -97,11 +99,14 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const db = supabaseAdmin();
   const [{ data: post }, { data: cliente }, contagem] = await Promise.all([
     db.from("posts").select("id, prompt_imagem, titulo_arte, topicos").eq("id", postId).eq("cliente_id", clienteId).single(),
-    db.from("clientes").select("logo_url, nome_empresa, planos(posts_por_semana)").eq("id", clienteId).single(),
+    db.from("clientes").select("logo_url, nome_empresa, assinatura, planos(posts_por_semana)").eq("id", clienteId).single(),
     contarArtes(clienteId),
   ]);
   if (!post) throw new Error("Post não encontrado");
 
+  if (cliente?.assinatura !== "ativa" && contagem.noMes >= ARTES_DEMO) {
+    throw new LimiteDeArtes(`A demonstração inclui ${ARTES_DEMO} artes`);
+  }
   const porSemana = (cliente as any)?.planos?.posts_por_semana ?? 7;
   const limiteMes = porSemana * 4 * ARTES_POR_POST_NO_MES;
   if ((contagem.porPost[postId] ?? 0) >= ARTES_POR_POST) {
