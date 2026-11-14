@@ -58,11 +58,6 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
   const historico = a.historico.length
     ? a.historico.map((p) => `- ${p.titulo}${p.tema ? ` (${p.tema})` : ""}`).join("\n")
     : "(nenhum post ainda: esta é a primeira semana da conta, então apresente a empresa)";
-  const cores = a.briefing.cores || "as cores da marca, se conhecidas; senão, tons escuros elegantes";
-  const logo = a.temLogo
-    ? "A logo da marca será anexada à geração da imagem: reserve o canto inferior direito para ela e NÃO descreva nem invente uma logo."
-    : `Não há logo: escreva o nome "${a.empresa}" em letras pequenas no canto inferior direito.`;
-
   const sistema =
     `Você é a social media sênior de uma agência brasileira que cuida do Instagram de pequenos negócios. ` +
     `Você conhece a empresa a fundo pelo briefing e planeja o feed como uma estratégia, não como posts soltos. ` +
@@ -85,13 +80,9 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `- "legenda": 3 parágrafos curtos separados por linha em branco (total até 400 caracteres): o gancho, ` +
     `o valor para o cliente e a chamada para ação ou pergunta. Sem hashtags dentro da legenda.\n` +
     `- "hashtags": array de 5 hashtags, misturando o nome da marca, o ramo e o assunto\n` +
-    `- "prompt_imagem": descrição em INGLÊS para um gerador de imagens criar a arte quadrada do post, no formato:\n` +
-    `  "Square Instagram post, professional photographic background: <cena realista ligada ao assunto e ao ramo, sem pessoas identificáveis famosas, sem texto na cena>. ` +
-    `Dark semi-transparent overlay using ${cores} so the text stands out. ` +
-    `Bold white sans-serif title at the bottom-left reading exactly: '<titulo>'. ` +
-    `Below it, 3 lines with small check icons reading exactly: '<topico 1>', '<topico 2>', '<topico 3>'. ` +
-    `${logo} Clean, modern, high contrast, no other text, no watermark."\n` +
-    `  Os textos entre aspas devem ser idênticos ao titulo e aos topicos, em português, com acentos.\n\n` +
+    `- "prompt_imagem": descrição em INGLÊS, de 1 a 2 frases, de uma FOTO realista para o fundo da arte, ligada ao assunto do post e ao ramo da empresa ` +
+    `(ex.: a scene, an object, a place, hands working; sem rostos famosos, sem marcas conhecidas, SEM texto ou logos na cena). ` +
+    `O título, os tópicos e a logo serão escritos por cima depois, então não os descreva.\n\n` +
     `Responda SOMENTE um array JSON com ${a.quantidade} objetos, sem comentários.`;
 
   return { sistema, usuario };
