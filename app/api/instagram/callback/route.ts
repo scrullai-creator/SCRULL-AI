@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
-import { trocarCodigo, tokenLongo, perfil } from "@/lib/instagram";
+import { trocarCodigo, perfil, SemContaInstagram } from "@/lib/instagram";
 import { cifrar } from "@/lib/crypto";
 
 export async function GET(req: NextRequest) {
@@ -34,11 +34,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const cleanCode = code.replace(/#.*$/, "");
-    const curto = await trocarCodigo(cleanCode);
-    const longo = await tokenLongo(curto.token);
-    const p = await perfil(longo.token);
-
-    if (!["BUSINESS", "MEDIA_CREATOR"].includes(p.tipo)) return volta("conta-pessoal");
+    const acesso = await trocarCodigo(cleanCode);
+    const p = await perfil(acesso.token);
 
     const { data: conta, error } = await db
       .from("contas_instagram")
@@ -52,14 +49,16 @@ export async function GET(req: NextRequest) {
 
     const { error: erroToken } = await db.from("tokens_instagram").upsert({
       conta_id: conta.id,
-      token_cifrado: cifrar(longo.token),
-      expira_em: longo.expiraEm.toISOString(),
+      token_cifrado: cifrar(acesso.token),
+      // token de usuário do sistema não expira: guarda uma data bem distante
+      expira_em: (acesso.expiraEm ?? new Date("2099-12-31T00:00:00Z")).toISOString(),
       atualizado_em: new Date().toISOString(),
     });
     if (erroToken) throw erroToken;
 
     return volta("ok");
   } catch (e) {
+    if (e instanceof SemContaInstagram) return volta("sem-conta");
     console.error("Erro no login do Instagram:", e);
     return volta("erro");
   }

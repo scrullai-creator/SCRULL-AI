@@ -1,25 +1,22 @@
-// Instagram API with Instagram Login (Business Login for Instagram).
-// O cliente entra direto pelo Instagram: não precisa de Página do Facebook.
-// Usa o ID e a chave secreta do app do INSTAGRAM (painel Meta > Instagram >
-// "Configuração da API com login do Instagram"), que são diferentes dos do app da Meta.
-const AUTORIZAR = "https://www.instagram.com/oauth/authorize";
-const TROCA = "https://api.instagram.com/oauth/access_token";
-const GRAPH = "https://graph.instagram.com";
-
-const ESCOPOS = "instagram_business_basic,instagram_business_content_publish";
-const SESSENTA_DIAS = 5184000;
+// API do Instagram com Login Unificado (Login do Facebook para Empresas + config_id).
+// O cliente entra com o Instagram OU com o Facebook e não precisa de Página do Facebook.
+// O app recebe um token de usuário do sistema do portfólio empresarial do cliente,
+// que, na configuração atual do painel da Meta, não expira.
+const GRAPH = "https://graph.facebook.com/v27.0";
 
 export const redirectUri = () => `${process.env.APP_URL}/api/instagram/callback`;
 
+// As permissões vêm da configuração (config_id) criada no painel da Meta, não de "scope".
 export function urlDeAutorizacao(state: string) {
   const p = new URLSearchParams({
-    client_id: process.env.INSTAGRAM_APP_ID!,
+    client_id: process.env.META_APP_ID!,
+    config_id: process.env.INSTAGRAM_CONFIG_ID!,
     redirect_uri: redirectUri(),
     response_type: "code",
-    scope: ESCOPOS,
+    prompt: "login", // sempre mostra as opções "Instagram" e "Facebook"
     state,
   });
-  return `${AUTORIZAR}?${p}`;
+  return `https://www.facebook.com/dialog/oauth?${p}`;
 }
 
 // Lê a resposta da Meta sem nunca registrar tokens nos logs.
@@ -28,63 +25,40 @@ async function json(res: Response) {
   try {
     j = await res.json();
   } catch {
-    throw new Error(`Resposta inválida do Instagram (${res.status})`);
+    throw new Error(`Resposta inválida da Meta (${res.status})`);
   }
-  if (!res.ok || j.error || j.error_message) {
-    const msg = j.error?.message ?? j.error_message ?? `Erro ${res.status}`;
-    console.error("Instagram API erro:", res.status, j.error?.type ?? j.error_type ?? "", msg);
+  if (!res.ok || j.error) {
+    const msg = j.error?.message ?? `Erro ${res.status}`;
+    console.error("Meta API erro:", res.status, j.error?.type ?? "", j.error?.code ?? "", msg);
     throw new Error(msg);
   }
   return j;
 }
 
 export async function trocarCodigo(code: string) {
-  const body = new URLSearchParams({
-    client_id: process.env.INSTAGRAM_APP_ID!,
-    client_secret: process.env.INSTAGRAM_APP_SECRET!,
-    grant_type: "authorization_code",
+  const p = new URLSearchParams({
+    client_id: process.env.META_APP_ID!,
+    client_secret: process.env.META_APP_SECRET!,
     redirect_uri: redirectUri(),
     code,
   });
-  const j = await json(await fetch(TROCA, { method: "POST", body }));
-  // A resposta pode vir direta ou dentro de "data": [ { ... } ]
-  const d = Array.isArray(j.data) ? j.data[0] : j;
-  if (!d?.access_token) throw new Error("O Instagram não devolveu o token");
-  return { token: d.access_token as string, userId: String(d.user_id ?? "") };
-}
-
-export async function tokenLongo(tokenCurto: string) {
-  const p = new URLSearchParams({
-    grant_type: "ig_exchange_token",
-    client_secret: process.env.INSTAGRAM_APP_SECRET!,
-    access_token: tokenCurto,
-  });
-  const j = await json(await fetch(`${GRAPH}/access_token?${p}`));
+  const j = await json(await fetch(`${GRAPH}/oauth/access_token?${p}`));
+  if (!j.access_token) throw new Error("A Meta não devolveu o token");
   return {
     token: j.access_token as string,
-    expiraEm: new Date(Date.now() + Number(j.expires_in ?? SESSENTA_DIAS) * 1000),
+    // Token de usuário do sistema normalmente vem sem prazo (não expira)
+    expiraEm: j.expires_in ? new Date(Date.now() + Number(j.expires_in) * 1000) : null,
   };
 }
 
-// Renova um token longo por mais 60 dias (o token precisa ter pelo menos 24h e ainda estar válido).
-export async function renovarToken(token: string) {
-  const p = new URLSearchParams({ grant_type: "ig_refresh_token", access_token: token });
-  const j = await json(await fetch(`${GRAPH}/refresh_access_token?${p}`));
-  return {
-    token: j.access_token as string,
-    expiraEm: new Date(Date.now() + Number(j.expires_in ?? SESSENTA_DIAS) * 1000),
-  };
-}
+export class SemContaInstagram extends Error {}
 
+// Com esse tipo de token, /me é o usuário do sistema, não a conta do Instagram.
+// As contas que o cliente compartilhou ficam em /me/assigned_instagram_accounts.
 export async function perfil(token: string) {
-  const p = new URLSearchParams({ fields: "user_id,username,account_type", access_token: token });
-  const ig = await json(await fetch(`${GRAPH}/me?${p}`));
-  // user_id é o ID da conta profissional, usado depois para publicar
-  const userId = ig.user_id ?? ig.id;
-  if (!userId) throw new Error("Conta do Instagram não encontrada");
-  return {
-    userId: String(userId),
-    username: String(ig.username ?? ""),
-    tipo: String(ig.account_type ?? "BUSINESS"),
-  };
+  const p = new URLSearchParams({ fields: "id,username", access_token: token });
+  const j = await json(await fetch(`${GRAPH}/me/assigned_instagram_accounts?${p}`));
+  const conta = (j.data ?? [])[0];
+  if (!conta?.id) throw new SemContaInstagram("Nenhuma conta do Instagram foi compartilhada");
+  return { userId: String(conta.id), username: String(conta.username ?? "") };
 }

@@ -10,6 +10,7 @@ const AVISOS: Record<string, [string, boolean]> = {
   "ger-erro": ["Não foi possível criar os posts agora. Tente de novo em instantes.", false],
   negado: ["Você cancelou a conexão. Quando quiser, é só tentar de novo.", false],
   erro: ["Não foi possível conectar agora. Tente de novo em instantes.", false],
+  "sem-conta": ["Nenhuma conta do Instagram foi compartilhada. Conecte de novo e selecione a conta da sua empresa.", false],
   "conta-pessoal": ["Essa conta é pessoal. Mude para Comercial ou Criador nas configurações do Instagram e conecte de novo.", false],
 };
 
