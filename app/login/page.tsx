@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseNavegador } from "@/lib/supabase-browser";
 
@@ -12,6 +12,11 @@ export default function Login() {
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
+
+  // /login?aba=cadastro abre direto em "Criar conta" (link da página de vendas)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("aba") === "cadastro") setAba("cadastro");
+  }, []);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
