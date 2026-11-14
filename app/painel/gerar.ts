@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
 import { criarPosts } from "@/lib/gerar-posts";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
-import { gerarArteDoPost, guardarArquivo } from "@/lib/imagem";
+import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
 
 const HORAS = ["19:00", "12:00", "11:30", "18:30", "19:00", "12:30", "19:00"];
 
@@ -125,7 +125,11 @@ export async function gerarImagemPost(f: FormData) {
     await gerarArteDoPost(id, user.id);
     resultado = "img-ok";
   } catch (e) {
-    console.error("Erro ao gerar imagem:", e);
+    if (e instanceof LimiteDeArtes) {
+      resultado = "img-limite";
+    } else {
+      console.error("Erro ao gerar imagem:", e);
+    }
   }
   revalidatePath("/painel");
   redirect(`/painel?ig=${resultado}#post-${id}`);

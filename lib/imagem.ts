@@ -68,14 +68,48 @@ export async function guardarArquivo(caminho: string, bytes: Buffer | ArrayBuffe
   return data.publicUrl;
 }
 
+// Limites de geração, para o cliente não gastar o saldo de imagens sem querer:
+// até 3 artes por post e, por mês, 2 artes por post previsto no plano.
+export const ARTES_POR_POST = Number(process.env.LIMITE_ARTES_POR_POST ?? 3);
+const ARTES_POR_POST_NO_MES = 2;
+
+export class LimiteDeArtes extends Error {}
+
+// Conta as artes já geradas olhando os arquivos guardados (nome: <post>-<data>.jpg)
+export async function contarArtes(clienteId: string) {
+  const db = supabaseAdmin();
+  const { data, error } = await db.storage.from(PASTA).list(clienteId, { limit: 1000 });
+  if (error) throw new Error(`Erro ao listar as artes: ${error.message}`);
+  const umMesAtras = Date.now() - 30 * 86400000;
+  const artes = (data ?? []).filter((f) => !f.name.startsWith("logo."));
+  const porPost: Record<string, number> = {};
+  let noMes = 0;
+  for (const f of artes) {
+    const postId = f.name.replace(/-\d+\.jpg$/, "");
+    porPost[postId] = (porPost[postId] ?? 0) + 1;
+    if (new Date(f.created_at ?? 0).getTime() >= umMesAtras) noMes++;
+  }
+  return { porPost, noMes };
+}
+
 // Gera a arte de um post e salva a URL nele
 export async function gerarArteDoPost(postId: string, clienteId: string) {
   const db = supabaseAdmin();
-  const [{ data: post }, { data: cliente }] = await Promise.all([
+  const [{ data: post }, { data: cliente }, contagem] = await Promise.all([
     db.from("posts").select("id, prompt_imagem, titulo_arte, topicos").eq("id", postId).eq("cliente_id", clienteId).single(),
-    db.from("clientes").select("logo_url, nome_empresa").eq("id", clienteId).single(),
+    db.from("clientes").select("logo_url, nome_empresa, planos(posts_por_semana)").eq("id", clienteId).single(),
+    contarArtes(clienteId),
   ]);
   if (!post) throw new Error("Post não encontrado");
+
+  const porSemana = (cliente as any)?.planos?.posts_por_semana ?? 7;
+  const limiteMes = porSemana * 4 * ARTES_POR_POST_NO_MES;
+  if ((contagem.porPost[postId] ?? 0) >= ARTES_POR_POST) {
+    throw new LimiteDeArtes(`Este post já tem ${ARTES_POR_POST} artes geradas`);
+  }
+  if (contagem.noMes >= limiteMes) {
+    throw new LimiteDeArtes(`Limite de ${limiteMes} artes por mês atingido`);
+  }
 
   const prompt = post.prompt_imagem || promptPadrao(post.titulo_arte, post.topicos ?? [], cliente?.nome_empresa ?? "");
   const bytes = await gerarImagem(prompt, cliente?.logo_url);

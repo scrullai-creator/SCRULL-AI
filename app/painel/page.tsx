@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost } from "./gerar";
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
+import { ARTES_POR_POST, contarArtes } from "@/lib/imagem";
 import { aprovarPost, recusarPost, aprovarTodos, salvarLegenda, alternarConfig, sair } from "./actions";
 
 // Gerar a arte pode levar até ~40 s
@@ -14,6 +15,7 @@ const AVISOS: Record<string, [string, boolean]> = {
   "ger-erro": ["Não foi possível criar os posts agora. Tente de novo em instantes.", false],
   "img-ok": ["Arte criada! Se não gostar, é só gerar outra.", true],
   "img-erro": ["Não foi possível criar a arte agora. Tente de novo em instantes.", false],
+  "img-limite": [`Limite de artes atingido: cada post pode ter até ${ARTES_POR_POST} artes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
   "perfil-ok": ["Briefing salvo! Agora a Scrull conhece a sua marca.", true],
   "perfil-erro": ["Não foi possível salvar o briefing. Tente de novo.", false],
   negado: ["Você cancelou a conexão. Quando quiser, é só tentar de novo.", false],
@@ -61,6 +63,8 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
   ]);
 
   const conta = contas?.[0];
+  const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
+  const artes = posts?.some((p) => p.imagem_url) ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
   const aviso = ig ? AVISOS[ig] : undefined;
   const briefing = lerBriefing(cliente?.briefing);
   const briefingPreenchido = Object.keys(briefing).length > 0;
@@ -190,10 +194,16 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                     {p.erro_msg && <p className="erro">{p.erro_msg}</p>}
                     {editavel && (
                       <div className="acoes">
-                        <form action={gerarImagemPost}>
-                          <input type="hidden" name="id" value={p.id} />
-                          <button className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>{p.imagem_url ? "Gerar outra arte" : "Criar arte"}</button>
-                        </form>
+                        {(artes.porPost[p.id] ?? 0) < ARTES_POR_POST ? (
+                          <form action={gerarImagemPost}>
+                            <input type="hidden" name="id" value={p.id} />
+                            <button className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>
+                              {p.imagem_url ? `Gerar outra arte (${ARTES_POR_POST - (artes.porPost[p.id] ?? 0)} restantes)` : "Criar arte"}
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="badge cinza">Limite de artes deste post</span>
+                        )}
                         {p.status !== "aprovado" && (
                           <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><button className="btn sm">Aprovar</button></form>
                         )}
