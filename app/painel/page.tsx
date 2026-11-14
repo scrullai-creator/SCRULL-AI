@@ -201,7 +201,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                             </button>
                           </form>
                         ) : (
-                          <span className="badge cinza">{assinante ? "Limite de artes deste post" : "Assine para criar mais artes"}</span>
+                          assinante
+                            ? <span className="badge cinza">Limite de artes deste post</span>
+                            : <span className="assine">Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.</span>
                         )}
                         {p.status !== "aprovado" && (
                           <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><button className="btn sm">Aprovar</button></form>
