@@ -33,7 +33,15 @@ export async function criarPosts(a: {
 
   const j = await res.json();
   const texto = (j.content ?? []).map((b: any) => b.text ?? "").join("");
-  const lista = JSON.parse(texto.replace(/```json|```/g, "").trim());
+  // A IA às vezes escreve algo antes ou depois do JSON: fica só com o array
+  const inicio = texto.indexOf("[");
+  const fim = texto.lastIndexOf("]");
+  let lista: unknown;
+  try {
+    lista = JSON.parse(inicio >= 0 && fim > inicio ? texto.slice(inicio, fim + 1) : texto.trim());
+  } catch {
+    throw new Error("A IA devolveu uma resposta inválida");
+  }
   if (!Array.isArray(lista) || !lista.length) throw new Error("Resposta da IA fora do formato");
 
   return lista.slice(0, a.quantidade).map((p: any) => ({

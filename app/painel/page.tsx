@@ -42,8 +42,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
   const [{ data: cliente }, { data: cfg }, { data: contas }, { data: posts }] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", user.id).single(),
     supabase.from("configuracoes").select("*").eq("cliente_id", user.id).single(),
-    supabase.from("contas_instagram").select("id, ig_username").eq("ativa", true).limit(1),
-    supabase.from("posts").select("*").gte("agendado_para", new Date().toISOString())
+    supabase.from("contas_instagram").select("id, ig_username")
+      .eq("cliente_id", user.id).eq("ativa", true).limit(1),
+    supabase.from("posts").select("*").eq("cliente_id", user.id)
+      .gte("agendado_para", new Date().toISOString())
       .order("agendado_para").limit(14),
   ]);
 
