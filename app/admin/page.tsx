@@ -33,7 +33,7 @@ export default async function Admin() {
   return (
     <>
       <header className="topo">
-        <div className="logo">SCRULL<i>AI</i> <small style={{ fontWeight: 600, opacity: .7 }}>· dono</small></div>
+        <div className="logo"><img src="/mascote-pequeno.png" alt="" width={34} height={34} className="logo-img" />SCRULL<i>AI</i> <small style={{ fontWeight: 600, opacity: .7 }}>· dono</small></div>
         <Link className="btn sm ghost" href="/painel" style={{ color: "#fff", borderColor: "#ffffff55" }}>Meu painel</Link>
       </header>
       <main>

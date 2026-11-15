@@ -94,14 +94,19 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
   return (
     <>
       <header className="topo">
-        <div className="logo">SCRULL<i>AI</i></div>
+        <div className="logo"><img src="/mascote-pequeno.png" alt="" width={34} height={34} className="logo-img" />SCRULL<i>AI</i></div>
         <form action={sair}><Botao className="btn sm ghost" style={{ color: "#fff", borderColor: "#ffffff55" }}>Sair</Botao></form>
       </header>
       <main>
-        <h1>Olá, {cliente?.nome_empresa ?? "bem-vinda"}!</h1>
-        <p className="sub">
-          {assinante ? "Sua assinatura está ativa." : `Demonstração grátis: crie sua primeira semana de posts e veja ${ARTES_DEMO} artes. Assine para publicar.`}
-        </p>
+        <div className="saudacao">
+          <img src="/mascote.png" alt="" width={84} height={84} />
+          <div>
+            <h1>Olá, {cliente?.nome_empresa ?? "bem-vinda"}!</h1>
+            <p className="sub">
+              {assinante ? "Sua assinatura está ativa." : `Demonstração grátis: crie sua primeira semana de posts e veja ${ARTES_DEMO} artes. Assine para publicar.`}
+            </p>
+          </div>
+        </div>
 
         {aviso && <div className={`aviso ${aviso[1] ? "ok" : ""}`} role="status">{aviso[0]}</div>}
 

@@ -90,3 +90,9 @@ details.cancelar summary{color:var(--mut);border:0;padding:0;font-weight:600}
 .cal-dia.sel{background:var(--p);color:#fff}
 .cal-dia i{position:absolute;left:50%;bottom:4px;width:6px;height:6px;border-radius:50%;transform:translateX(-50%)}
 .ad-post{display:grid;grid-template-columns:110px 1fr;gap:14px}.ad-p-img .arte{max-width:110px}
+header.topo{background:linear-gradient(135deg,#1d0f55,#3b1a8f 70%,#5b2bd9);box-shadow:0 4px 24px rgba(91,43,217,.35)}
+.logo{display:flex;align-items:center;gap:8px}.logo-img{width:34px;height:34px;border-radius:10px;box-shadow:0 0 14px rgba(167,139,250,.6)}
+.saudacao{display:flex;align-items:center;gap:14px;margin-bottom:6px}.saudacao h1{margin:0}.saudacao .sub{margin:2px 0 0}
+.saudacao img{width:84px;height:84px;border-radius:22px;flex:0 0 auto;box-shadow:0 6px 22px rgba(91,43,217,.35)}
+@media(max-width:480px){.saudacao img{width:64px;height:64px;border-radius:18px}}
+.card{box-shadow:0 2px 14px rgba(91,43,217,.07)}

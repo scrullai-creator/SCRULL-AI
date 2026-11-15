@@ -68,6 +68,8 @@ export default function Login() {
         .sl-card{background:rgba(255,255,255,.045);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border:1px solid rgba(255,255,255,.09);border-radius:24px;padding:40px 36px 36px;display:flex;flex-direction:column;gap:24px}
         .sl-brand{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
         .sl-logo{width:60px;height:60px;background:linear-gradient(135deg,#7c3aed,#5b21b6);border-radius:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 32px rgba(124,58,237,.35),0 4px 16px rgba(0,0,0,.5)}
+        .sl-mascote{width:120px;height:120px;border-radius:28px;box-shadow:0 0 44px rgba(124,58,237,.55),0 6px 20px rgba(0,0,0,.5);animation:slflut 4s ease-in-out infinite}
+        @keyframes slflut{50%{transform:translateY(-6px)}}
         .sl-name{font-family:'Syne',system-ui,sans-serif;font-size:26px;font-weight:800;letter-spacing:-.5px;color:#f0eaff;line-height:1}
         .sl-name span{color:#9f67ff}
         .sl-tag{font-size:13px;color:#9d8fc0}
@@ -96,7 +98,7 @@ export default function Login() {
         .sl-trust-item{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#6b5f8a}
         .sl-dot{width:5px;height:5px;border-radius:50%;background:#9f67ff;opacity:.6}
         @media(max-width:460px){.sl-card{padding:32px 24px 28px}.sl-name{font-size:22px}.sl-trust{gap:12px}}
-        @media(prefers-reduced-motion:reduce){.sl-orb{animation:none}}
+        @media(prefers-reduced-motion:reduce){.sl-orb,.sl-mascote{animation:none}}
       `}</style>      <div className="sl-root">
         <div className="sl-orb sl-orb-1" />
         <div className="sl-orb sl-orb-2" />
@@ -105,21 +107,10 @@ export default function Login() {
         <div className="sl-wrap">
           <div className="sl-card">
             <div className="sl-brand">
-              <div className="sl-logo">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <rect x="6" y="10" width="20" height="15" rx="4" fill="white" fillOpacity="0.9"/>
-                  <rect x="15" y="4" width="2" height="6" rx="1" fill="white" fillOpacity="0.9"/>
-                  <circle cx="16" cy="4" r="2" fill="white"/>
-                  <rect x="10" y="14" width="4" height="4" rx="1.5" fill="#7c3aed"/>
-                  <rect x="18" y="14" width="4" height="4" rx="1.5" fill="#7c3aed"/>
-                  <rect x="11" y="20" width="10" height="2" rx="1" fill="#7c3aed" fillOpacity="0.7"/>
-                  <rect x="3" y="14" width="3" height="6" rx="1.5" fill="white" fillOpacity="0.7"/>
-                  <rect x="26" y="14" width="3" height="6" rx="1.5" fill="white" fillOpacity="0.7"/>
-                </svg>
-              </div>
+              <img className="sl-mascote" src="/mascote.png" alt="Mascote do Scrull AI" width={120} height={120} />
               <div>
                 <div className="sl-name">SCRULL <span>AI</span></div>
-                <div className="sl-tag">Instagram automation for your business</div>
+                <div className="sl-tag">Seu Instagram no automático!</div>
               </div>
             </div>
             <div className="sl-tabs">
