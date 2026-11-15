@@ -93,6 +93,11 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `  "centro" = foto marcante com uma frase forte centralizada (bom para emoção, novidade, convite);\n` +
     `  "cartao" = foto em cima e um bloco de cor embaixo com título e subtítulo (bom para dica e informação);\n` +
     `  "frase" = fundo na cor da marca com uma frase grande, estilo citação (bom para reflexão, humor, pergunta).\n` +
+    `- IDENTIDADE: os posts representam SOMENTE a empresa ${a.empresa}. ` +
+    (/scrull/i.test(a.empresa) ? "" :
+      `Nunca cite o Scrull AI, nunca use mascote, robô, logotipo ou elementos de identidade do Scrull, e nunca use o roxo/tecnológico do Scrull por padrão: ` +
+      `use as cores, o estilo e a linguagem desta empresa (roxo só se o briefing pedir). `) +
+    `As fotos de "prompt_imagem" nunca incluem robôs, mascotes ou ícones de IA, a menos que o ramo seja tecnologia.\n` +
     `- ESTILO DO SEGMENTO (adapte ao ramo da empresa; nunca imponha o visual do Scrull): ` +
     `mercadinho/varejo = cores vibrantes, produtos em destaque, linguagem popular e próxima; ` +
     `confecção/uniformes = produto limpo, detalhe do tecido e da costura, tom profissional; ` +
