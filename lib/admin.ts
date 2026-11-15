@@ -5,7 +5,7 @@ import { supabaseDoUsuario } from "@/lib/supabase";
 // A checagem é feita no servidor, em toda página e em toda ação.
 export async function exigirAdmin() {
   const { data: { user } } = await (await supabaseDoUsuario()).auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?proximo=/admin");
   const lista = (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
   if (!user.email || !lista.includes(user.email.toLowerCase())) redirect("/acesso-dono");
   return user;

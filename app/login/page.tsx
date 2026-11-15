@@ -19,13 +19,19 @@ export default function Login() {
     if (new URLSearchParams(window.location.search).get("aba") === "cadastro") setAba("cadastro");
   }, []);
 
+  // Depois de entrar, volta para onde a pessoa queria ir (ex.: /admin). Só aceita caminhos do próprio site.
+  function destino() {
+    const p = new URLSearchParams(window.location.search).get("proximo") ?? "";
+    return /^\/[a-z0-9\-_/]*$/i.test(p) && !p.startsWith("//") ? p : "/painel";
+  }
+
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     setErro(""); setMsg(""); setCarregando(true);
     try {
       const { error } = await supabaseNavegador().auth.signInWithPassword({ email, password: senha });
       if (error) return setErro("E-mail ou senha incorretos. Tente novamente.");
-      router.push("/painel");
+      router.push(destino());
       router.refresh();
     } finally { setCarregando(false); }
   }
