@@ -3,6 +3,7 @@ import { exigirAdmin } from "@/lib/admin";
 import { supabaseAdmin } from "@/lib/supabase";
 import { contarArtes } from "@/lib/imagem";
 import { mudarAssinatura } from "./actions";
+import { sair } from "../painel/actions";
 import { Botao } from "../painel/botao";
 
 export const maxDuration = 60;
@@ -34,7 +35,7 @@ export default async function Admin() {
     <>
       <header className="topo">
         <div className="logo"><img src="/mascote-pequeno.png" alt="" width={34} height={34} className="logo-img" />SCRULL<i>AI</i> <small style={{ fontWeight: 600, opacity: .7 }}>· dono</small></div>
-        <Link className="btn sm ghost" href="/painel" style={{ color: "#fff", borderColor: "#ffffff55" }}>Meu painel</Link>
+        <span style={{ display: "flex", gap: 8 }}><Link className="btn sm ghost" href="/painel" style={{ color: "#fff", borderColor: "#ffffff55" }}>Meu painel</Link><form action={sair}><Botao className="btn sm ghost" style={{ color: "#fff", borderColor: "#ffffff55" }}>Sair</Botao></form></span>
       </header>
       <main>
         <h1>Meus clientes</h1>

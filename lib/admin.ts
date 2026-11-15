@@ -7,6 +7,6 @@ export async function exigirAdmin() {
   const { data: { user } } = await (await supabaseDoUsuario()).auth.getUser();
   if (!user) redirect("/login");
   const lista = (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
-  if (!user.email || !lista.includes(user.email.toLowerCase())) redirect("/painel");
+  if (!user.email || !lista.includes(user.email.toLowerCase())) redirect("/acesso-dono");
   return user;
 }
