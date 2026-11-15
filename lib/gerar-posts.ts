@@ -93,6 +93,14 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `  "centro" = foto marcante com uma frase forte centralizada (bom para emoção, novidade, convite);\n` +
     `  "cartao" = foto em cima e um bloco de cor embaixo com título e subtítulo (bom para dica e informação);\n` +
     `  "frase" = fundo na cor da marca com uma frase grande, estilo citação (bom para reflexão, humor, pergunta).\n` +
+    `- ESTILO DO SEGMENTO (adapte ao ramo da empresa; nunca imponha o visual do Scrull): ` +
+    `mercadinho/varejo = cores vibrantes, produtos em destaque, linguagem popular e próxima; ` +
+    `confecção/uniformes = produto limpo, detalhe do tecido e da costura, tom profissional; ` +
+    `restaurante/pizzaria/delivery = foto apetitosa, cores quentes, vapor, ingredientes, convite para pedir; ` +
+    `beleza/estética = luz suave, tons delicados, elegância e cuidado; ` +
+    `tecnologia/educação = tons frios, gradientes, composição moderna e objetiva; ` +
+    `serviços = confiança, autoridade, dica prática. ` +
+    `Alterne também o TIPO do post: lançamento, dica ou tutorial, bastidores, data especial, frase de engajamento, pergunta ao público e prova real.\n` +
     `- Legendas: varie o tamanho (algumas de 1 ou 2 linhas, outras com 3 ou 4 parágrafos curtos), o começo ` +
     `(nem sempre pergunta, nem sempre "Você sabia"), o final (convite, pergunta, frase de efeito, chamada para o direct) ` +
     `e o uso de emoji conforme o tom e o que o perfil já usa.\n\n` +

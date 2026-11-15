@@ -27,7 +27,7 @@ const AVISOS: Record<string, [string, boolean]> = {
   "cancel-ok": ["Assinatura cancelada. Seus posts ficam guardados caso você volte.", true],
   "cancel-erro": ["Não foi possível cancelar agora. Tente de novo em instantes.", false],
   "demo-usada": ["Sua semana grátis já foi criada. Assine para criar novas semanas, liberar todas as artes e publicar.", false],
-  "img-limite": [`Limite de artes atingido: cada post pode ter até ${ARTES_POR_POST} artes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
+  "img-limite": [`Limite de artes atingido: cada post pode ser trocado até ${ARTES_POR_POST - 1} vezes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
   "perfil-ok": ["Briefing salvo! Agora a Scrull conhece a sua marca.", true],
   "perfil-erro": ["Não foi possível salvar o briefing. Tente de novo.", false],
   negado: ["Você cancelou a conexão. Quando quiser, é só tentar de novo.", false],
@@ -246,7 +246,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                           <form action={gerarImagemPost}>
                             <input type="hidden" name="id" value={p.id} />
                             <Botao className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>
-                              {p.imagem_url ? `Gerar outra arte (${assinante ? ARTES_POR_POST - (artes.porPost[p.id] ?? 0) : ARTES_DEMO - artes.noMes} restantes)` : "Criar arte"}
+                              {p.imagem_url ? `Trocar a arte (${assinante ? ARTES_POR_POST - (artes.porPost[p.id] ?? 0) : ARTES_DEMO - artes.noMes} ${(assinante ? ARTES_POR_POST - (artes.porPost[p.id] ?? 0) : ARTES_DEMO - artes.noMes) === 1 ? "troca restante" : "trocas restantes"})` : "Criar arte"}
                             </Botao>
                           </form>
                         ) : (
