@@ -4,6 +4,7 @@
 import { supabaseAdmin } from "./supabase";
 import { montarArte, corDaMarca } from "./arte";
 import { lerBriefing } from "./briefing";
+import { listarFotos, prepararFoto } from "./fotos";
 
 const MODELO = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5";
 const QUALIDADE = process.env.OPENAI_IMAGE_QUALITY ?? "medium"; // low | medium | high
@@ -97,7 +98,14 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   }
 
   const cena = post.prompt_imagem || "A clean, modern workspace of a small business owner, warm tones.";
-  const [foto, logo] = await Promise.all([gerarFoto(cena), lerLogo(cliente?.logo_url)]);
+  // Se o cliente enviou fotos, as primeiras artes de cada post usam essas fotos reais (sem custo de IA);
+  // as trocas seguintes passam para as outras fotos e, acabando elas, para uma foto gerada.
+  const fotosDoCliente = await listarFotos(clienteId).catch(() => []);
+  const usadas = contagem.porPost[postId] ?? 0;
+  const gancho = [...postId].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const escolhida = fotosDoCliente.length > 0 && usadas < fotosDoCliente.length
+    ? await prepararFoto(fotosDoCliente[(gancho + usadas) % fotosDoCliente.length].url) : null;
+  const [foto, logo] = await Promise.all([escolhida ?? gerarFoto(cena), lerLogo(cliente?.logo_url)]);
   const bytes = await montarArte({
     fundoJpeg: foto, titulo: post.titulo_arte ?? cliente?.nome_empresa ?? "", topicos: post.topicos ?? [],
     layout: (post.layout as any) ?? "faixa", subtitulo: post.subtitulo ?? "",

@@ -5,6 +5,9 @@ import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
 import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
 import { VerPost } from "./ver-post";
 import { Botao } from "./botao";
+import { EnviarFotos } from "./enviar-fotos";
+import { apagarFoto } from "./fotos";
+import { listarFotos, MAX_FOTOS } from "@/lib/fotos";
 import { aprovarPost, recusarPost, aprovarTodos, salvarLegenda, alternarConfig, sair } from "./actions";
 
 // Gerar a arte pode levar até ~40 s
@@ -77,6 +80,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
   const reais = (c: number) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const ehDono = (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((e) => e.trim()).includes((user.email ?? "").toLowerCase());
+  const fotos = await listarFotos(user.id).catch(() => []);
   const conta = contas?.[0];
   const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
   const artes = posts?.length ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
@@ -185,6 +189,24 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                 <Botao className="btn">Salvar briefing</Botao>
               </form>
             </details>
+            <div className="card">
+              <b>Suas fotos</b>
+              <p className="sub" style={{ margin: "6px 0 10px" }}>
+                Envie fotos reais do seu produto, prato, loja ou equipe (até {MAX_FOTOS}). A Scrull usa as suas fotos nas artes, com luz e nitidez melhoradas, e sem inventar nada no produto.
+              </p>
+              {fotos.length > 0 && (
+                <div className="fotos">
+                  {fotos.map((f) => (
+                    <form key={f.nome} action={apagarFoto} className="foto">
+                      <img src={f.url} alt="Foto enviada" loading="lazy" />
+                      <input type="hidden" name="nome" value={f.nome} />
+                      <Botao className="btn sm ghost" aria-label="Remover foto">Remover</Botao>
+                    </form>
+                  ))}
+                </div>
+              )}
+              <EnviarFotos vagas={MAX_FOTOS - fotos.length} />
+            </div>
           </>
         )}
 

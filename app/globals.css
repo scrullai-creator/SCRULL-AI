@@ -96,3 +96,5 @@ header.topo{background:linear-gradient(135deg,#1d0f55,#3b1a8f 70%,#5b2bd9);box-s
 .saudacao img{width:84px;height:84px;border-radius:22px;flex:0 0 auto;box-shadow:0 6px 22px rgba(91,43,217,.35)}
 @media(max-width:480px){.saudacao img{width:64px;height:64px;border-radius:18px}}
 .card{box-shadow:0 2px 14px rgba(91,43,217,.07)}
+.fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-bottom:12px}
+.foto{margin:0;display:flex;flex-direction:column;gap:6px}.foto img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
