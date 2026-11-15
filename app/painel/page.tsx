@@ -4,6 +4,7 @@ import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
 import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
 import { VerPost } from "./ver-post";
+import { Botao } from "./botao";
 import { aprovarPost, recusarPost, aprovarTodos, salvarLegenda, alternarConfig, sair } from "./actions";
 
 // Gerar a arte pode levar até ~40 s
@@ -94,7 +95,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
     <>
       <header className="topo">
         <div className="logo">SCRULL<i>AI</i></div>
-        <form action={sair}><button className="btn sm ghost" style={{ color: "#fff", borderColor: "#ffffff55" }}>Sair</button></form>
+        <form action={sair}><Botao className="btn sm ghost" style={{ color: "#fff", borderColor: "#ffffff55" }}>Sair</Botao></form>
       </header>
       <main>
         <h1>Olá, {cliente?.nome_empresa ?? "bem-vinda"}!</h1>
@@ -135,7 +136,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                       {pl.preco_cheio_centavos ? <s>{reais(pl.preco_cheio_centavos)}</s> : null} {reais(pl.preco_centavos)}<small>/mês</small>
                     </span>
                     <small>{pl.posts_por_semana >= 7 ? "1 post por dia, todos os dias" : `${pl.posts_por_semana} posts por semana`}</small>
-                    <button className="btn">Assinar {pl.nome}</button>
+                    <Botao className="btn">Assinar {pl.nome}</Botao>
                   </form>
                 ))}
               </div>
@@ -172,7 +173,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                 ))}
                 <label htmlFor="logo">Logo da empresa <small className="dica">PNG ou JPG, até 2 MB. Aparece em todas as artes.</small></label>
                 <input id="logo" name="logo" type="file" accept="image/png,image/jpeg" className="campo" />
-                <button className="btn">Salvar briefing</button>
+                <Botao className="btn">Salvar briefing</Botao>
               </form>
             </details>
           </>
@@ -182,10 +183,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
         {cliente?.ramo && (
           <div className="acoes" style={{ marginBottom: 14 }}>
             {!posts?.length ? (
-              <form action={gerarSemana}><button className="btn">{assinante ? "Criar posts da semana" : "Criar minha semana grátis"}</button></form>
+              <form action={gerarSemana}><Botao className="btn">{assinante ? "Criar posts da semana" : "Criar minha semana grátis"}</Botao></form>
             ) : assinante ? (
               <form action={refazerSemana}>
-                <button className="btn ghost">Refazer a semana</button>
+                <Botao className="btn ghost">Refazer a semana</Botao>
                 <small className="dica" style={{ marginLeft: 8 }}>Apaga os posts não aprovados e cria outros.</small>
               </form>
             ) : null}
@@ -206,7 +207,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
             )}
             {pendentes > 0 && (
               <form action={aprovarTodos} style={{ marginBottom: 14 }}>
-                <button className="btn">Aprovar todos ({pendentes})</button>
+                <Botao className="btn">Aprovar todos ({pendentes})</Botao>
               </form>
             )}
             {posts.map((p) => {
@@ -219,10 +220,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                       <VerPost imagem={p.imagem_url} titulo={p.titulo_arte ?? ""} legenda={p.legenda} hashtags={p.hashtags ?? []}
                         perfil={conta?.ig_username ?? undefined} quando={quando(p.agendado_para)}>
                         {editavel && p.status !== "aprovado" && (
-                          <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><button className="btn">Aprovar este post</button></form>
+                          <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn">Aprovar este post</Botao></form>
                         )}
                         {editavel && p.status !== "recusado" && (
-                          <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><button className="btn ghost">Recusar</button></form>
+                          <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn ghost">Recusar</Botao></form>
                         )}
                       </VerPost>
                     ) : (
@@ -244,9 +245,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                         {(assinante ? (artes.porPost[p.id] ?? 0) < ARTES_POR_POST : artes.noMes < ARTES_DEMO) ? (
                           <form action={gerarImagemPost}>
                             <input type="hidden" name="id" value={p.id} />
-                            <button className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>
+                            <Botao className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>
                               {p.imagem_url ? `Gerar outra arte (${assinante ? ARTES_POR_POST - (artes.porPost[p.id] ?? 0) : ARTES_DEMO - artes.noMes} restantes)` : "Criar arte"}
-                            </button>
+                            </Botao>
                           </form>
                         ) : (
                           assinante
@@ -254,20 +255,20 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                             : <span className="assine">Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.</span>
                         )}
                         {assinante && conta && p.imagem_url && (
-                          <form action={publicarAgora}><input type="hidden" name="id" value={p.id} /><button className="btn sm ig-agora">Publicar agora</button></form>
+                          <form action={publicarAgora}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ig-agora">Publicar agora</Botao></form>
                         )}
                         {p.status !== "aprovado" && (
-                          <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><button className="btn sm">Aprovar</button></form>
+                          <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm">Aprovar</Botao></form>
                         )}
                         {p.status !== "recusado" && (
-                          <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><button className="btn sm ghost">Recusar</button></form>
+                          <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ghost">Recusar</Botao></form>
                         )}
                         <details>
                           <summary>Editar legenda</summary>
                           <form action={salvarLegenda}>
                             <input type="hidden" name="id" value={p.id} />
                             <textarea className="campo" name="legenda" rows={5} defaultValue={p.legenda} aria-label="Legenda do post" />
-                            <button className="btn sm">Salvar legenda</button>
+                            <Botao className="btn sm">Salvar legenda</Botao>
                           </form>
                         </details>
                       </div>
@@ -289,7 +290,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
           <details className="card cancelar">
             <summary>Cancelar assinatura</summary>
             <p className="sub" style={{ marginTop: 10 }}>Ao cancelar, a cobrança mensal para e a Scrull deixa de publicar. Seus posts ficam guardados.</p>
-            <form action={cancelar}><button className="btn ghost">Confirmar cancelamento</button></form>
+            <form action={cancelar}><Botao className="btn ghost">Confirmar cancelamento</Botao></form>
           </details>
         )}
       </main>

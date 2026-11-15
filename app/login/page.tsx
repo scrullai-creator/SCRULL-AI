@@ -9,6 +9,7 @@ export default function Login() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [ver, setVer] = useState(false);
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
@@ -84,6 +85,12 @@ export default function Login() {
         .sl-btn{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%);border:none;border-radius:12px;color:white;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;padding:15px;width:100%;transition:transform .15s ease,box-shadow .15s ease;box-shadow:0 4px 20px rgba(124,58,237,.4),0 1px 4px rgba(0,0,0,.3)}
         .sl-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 28px rgba(124,58,237,.5)}
         .sl-btn:disabled{opacity:.6;cursor:default}
+        .sl-senha{position:relative}.sl-senha input{padding-right:84px}
+        .sl-olho{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(139,92,246,.18);border:0;border-radius:8px;color:#c4b5fd;font:600 12.5px 'Inter',system-ui,sans-serif;padding:7px 10px;cursor:pointer}
+        .sl-olho:hover{background:rgba(139,92,246,.32)}.sl-olho:active{transform:translateY(-50%) scale(.94)}
+        .sl-btn:active:not(:disabled),.sl-tab:active{transform:scale(.97)}
+        .sl-btn:disabled::before{content:'';display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-2px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:slgiro .7s linear infinite}
+        @keyframes slgiro{to{transform:rotate(360deg)}}
         .sl-divider{height:1px;background:rgba(255,255,255,.09)}
         .sl-trust{display:flex;align-items:center;justify-content:center;gap:20px}
         .sl-trust-item{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#6b5f8a}
@@ -128,7 +135,7 @@ export default function Login() {
                 </div>
                 <div className="sl-field">
                   <label htmlFor="l-senha">Senha</label>
-                  <input id="l-senha" type="password" placeholder="••••••••" value={senha} onChange={e => setSenha(e.target.value)} required autoComplete="current-password" />
+                  <div className="sl-senha"><input id="l-senha" type={ver ? "text" : "password"} placeholder="••••••••" value={senha} onChange={e => setSenha(e.target.value)} required autoComplete="current-password" /><button type="button" className="sl-olho" onClick={() => setVer(v => !v)} aria-pressed={ver}>{ver ? "Ocultar" : "Mostrar"}</button></div>
                 </div>
                 <button type="submit" className="sl-btn" disabled={carregando}>{carregando ? "Entrando…" : "Entrar →"}</button>
               </form>
@@ -145,7 +152,7 @@ export default function Login() {
                 </div>
                 <div className="sl-field">
                   <label htmlFor="c-senha">Senha</label>
-                  <input id="c-senha" type="password" placeholder="Mínimo 8 caracteres" value={senha} onChange={e => setSenha(e.target.value)} required autoComplete="new-password" minLength={8} />
+                  <div className="sl-senha"><input id="c-senha" type={ver ? "text" : "password"} placeholder="Mínimo 8 caracteres" value={senha} onChange={e => setSenha(e.target.value)} required autoComplete="new-password" minLength={8} /><button type="button" className="sl-olho" onClick={() => setVer(v => !v)} aria-pressed={ver}>{ver ? "Ocultar" : "Mostrar"}</button></div>
                 </div>
                 <button type="submit" className="sl-btn" disabled={carregando}>{carregando ? "Criando conta…" : "Começar 7 dias grátis →"}</button>
               </form>
