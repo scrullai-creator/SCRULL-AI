@@ -3,7 +3,7 @@
 // e sem "Pausar publicações" ligado. Se o post ainda não tem arte, cria antes.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { publicarPost } from "@/lib/publicar";
+import { publicarPost, VideoEmProcessamento } from "@/lib/publicar";
 import { gerarArteDoPost } from "@/lib/imagem";
 
 export const maxDuration = 60;
@@ -22,7 +22,7 @@ async function rodar(req: NextRequest) {
   const agora = new Date();
   const limite = new Date(agora.getTime() - ATRASO_MAXIMO_H * 3600 * 1000);
   const { data: fila, error } = await db.from("posts")
-    .select("id, cliente_id, imagem_url, clientes!inner(assinatura), erro_msg")
+    .select("id, cliente_id, imagem_url, video_url, clientes!inner(assinatura), erro_msg")
     .eq("status", "aprovado")
     .eq("clientes.assinatura", "ativa")
     .lte("agendado_para", agora.toISOString())
@@ -42,12 +42,20 @@ async function rodar(req: NextRequest) {
   const pausados = new Set((cfgs ?? []).filter((c) => c.pausado).map((c) => c.cliente_id));
 
   const resultado: { id: string; ok: boolean; motivo?: string }[] = [];
+  const inicio = Date.now();
   for (const p of (fila ?? []).filter((p) => !pausados.has(p.cliente_id)).slice(0, POR_RODADA)) {
+    // Um reels pode levar ~40 s esperando o Instagram: não começa outro post perto do limite de 60 s
+    if (Date.now() - inicio > 15_000) break;
     try {
-      if (!p.imagem_url) await gerarArteDoPost(p.id, p.cliente_id);
+      if (!p.imagem_url && !p.video_url) await gerarArteDoPost(p.id, p.cliente_id);
       await publicarPost(p.id, p.cliente_id);
       resultado.push({ id: p.id, ok: true });
     } catch (e) {
+      // Reels ainda em processamento no Instagram: continua aprovado e sai na próxima rodada
+      if (e instanceof VideoEmProcessamento) {
+        resultado.push({ id: p.id, ok: false, motivo: "vídeo em processamento" });
+        continue;
+      }
       const motivo = e instanceof Error ? e.message : "erro";
       // Marca como erro para não tentar de novo a cada rodada; o cliente vê o motivo no painel
       await db.from("posts").update({ status: "erro", erro_msg: motivo.slice(0, 300) }).eq("id", p.id);
