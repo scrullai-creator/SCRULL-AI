@@ -76,6 +76,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
   ]);
   const reais = (c: number) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const ehDono = (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((e) => e.trim()).includes((user.email ?? "").toLowerCase());
   const conta = contas?.[0];
   const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
   const artes = posts?.length ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
@@ -95,7 +96,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
     <>
       <header className="topo">
         <div className="logo"><img src="/mascote-pequeno.png" alt="" width={34} height={34} className="logo-img" />SCRULL<i>AI</i></div>
-        <form action={sair}><Botao className="btn sm ghost" style={{ color: "#fff", borderColor: "#ffffff55" }}>Sair</Botao></form>
+        <span style={{ display: "flex", gap: 8 }}>
+          {ehDono && <a className="btn sm ghost" href="/admin" style={{ color: "#fff", borderColor: "#ffffff55" }}>Administração</a>}
+          <form action={sair}><Botao className="btn sm ghost" style={{ color: "#fff", borderColor: "#ffffff55" }}>Sair</Botao></form>
+        </span>
       </header>
       <main>
         <div className="saudacao">
