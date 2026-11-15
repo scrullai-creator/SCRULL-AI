@@ -6,7 +6,7 @@ import { criarPosts } from "@/lib/gerar-posts";
 import { lerPerfil, resumoDoPerfil } from "@/lib/instagram-leitura";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
 import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
-import { publicarPost } from "@/lib/publicar";
+import { publicarPost, VideoEmProcessamento } from "@/lib/publicar";
 import { criarAssinatura, cancelarAssinatura, pagamentoConfigurado } from "@/lib/mercadopago";
 
 const HORAS = ["19:00", "12:00", "11:30", "18:30", "19:00", "12:30", "19:00"];
@@ -170,7 +170,14 @@ export async function publicarAgora(f: FormData) {
       resultado = "pub-ok";
     }
   } catch (e) {
-    console.error("Erro ao publicar:", e);
+    if (e instanceof VideoEmProcessamento) {
+      // A fila de publicação termina em alguns minutos
+      await supabaseAdmin().from("posts").update({ status: "aprovado", agendado_para: new Date().toISOString() })
+        .eq("id", id).eq("cliente_id", user.id);
+      resultado = "pub-processando";
+    } else {
+      console.error("Erro ao publicar:", e);
+    }
   }
   revalidatePath("/painel");
   redirect(`/painel?ig=${resultado}#post-${id}`);

@@ -8,6 +8,9 @@ import { Botao } from "./botao";
 import { EnviarFotos } from "./enviar-fotos";
 import { apagarFoto } from "./fotos";
 import { listarFotos, MAX_FOTOS } from "@/lib/fotos";
+import { EnviarVideo } from "./enviar-video";
+import { removerVideo, transformarEmReels } from "./videos";
+import { podeUsarVideos, videosDoMes, edicaoConfigurada, MAX_VIDEOS_MES, MAX_SEGUNDOS, MAX_MB, TIPOS_VIDEO } from "@/lib/videos";
 import { aprovarPost, recusarPost, aprovarTodos, salvarLegenda, alternarConfig, sair } from "./actions";
 
 // Gerar a arte pode levar até ~40 s
@@ -21,6 +24,9 @@ const AVISOS: Record<string, [string, boolean]> = {
   "img-ok": ["Arte criada! Se não gostar, é só gerar outra.", true],
   "img-erro": ["Não foi possível criar a arte agora. Tente de novo em instantes.", false],
   "pub-ok": ["Post publicado no Instagram!", true],
+  "pub-processando": ["O Instagram está processando o vídeo. O reels sai sozinho em alguns minutos.", true],
+  "reels-ok": ["Reels criado! A Scrull escreveu a legenda. Revise e aprove.", true],
+  "reels-erro": ["Não foi possível criar o reels agora. Tente de novo em instantes.", false],
   "pub-erro": ["Não foi possível publicar agora. Veja o motivo no post e tente de novo.", false],
   "pub-assine": ["Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.", false],
   "assin-ok": ["Assinatura confirmada! A Scrull já pode publicar para você.", true],
@@ -81,6 +87,14 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
 
   const ehDono = (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((e) => e.trim()).includes((user.email ?? "").toLowerCase());
   const fotos = await listarFotos(user.id).catch(() => []);
+  const comVideos = podeUsarVideos(cliente, ehDono);
+  const [{ data: videos }, enviadosNoMes] = comVideos
+    ? await Promise.all([
+        supabase.from("videos").select("id, url_original, url_editado, descricao, duracao_s, status, post_id, erro_msg")
+          .eq("cliente_id", user.id).order("criado_em", { ascending: false }).limit(12),
+        videosDoMes(user.id).catch(() => 0),
+      ])
+    : [{ data: [] as any[] }, 0];
   const conta = contas?.[0];
   const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
   const artes = posts?.length ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
@@ -94,7 +108,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
       hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
     });
   const pendentes = posts?.filter((p) => p.status === "aguardando_aprovacao").length ?? 0;
-  const semArte = posts?.filter((p) => !p.imagem_url && p.status !== "recusado").length ?? 0;
+  const semArte = posts?.filter((p) => !p.imagem_url && !p.video_url && p.status !== "recusado").length ?? 0;
 
   return (
     <>
@@ -207,6 +221,43 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
               )}
               <EnviarFotos vagas={MAX_FOTOS - fotos.length} />
             </div>
+            {comVideos && (
+            <div className="card">
+              <b>Seus vídeos</b>
+              {comVideos ? (
+                <>
+                  <p className="sub" style={{ margin: "6px 0 10px" }}>
+                    Gravou o forno, um produto ou a loja? Envie o vídeo (até {MAX_SEGUNDOS} segundos, na vertical).
+                    {edicaoConfigurada() ? " A Scrull coloca legendas e corta as pausas com IA," : ""} A Scrull escreve a legenda e transforma em reels.
+                    {` ${Math.max(0, MAX_VIDEOS_MES - enviadosNoMes)} de ${MAX_VIDEOS_MES} vídeos disponíveis este mês.`}
+                  </p>
+                  {!!videos?.length && (
+                    <div className="videos">
+                      {videos.map((v) => (
+                        <div key={v.id} className="video">
+                          <video src={v.url_editado ?? v.url_original} controls playsInline preload="metadata" />
+                          <span className={`badge ${v.status === "pronto" || v.post_id ? "ok" : v.status === "erro" ? "" : "cinza"}`}>
+                            {v.post_id ? "Virou reels" : v.status === "editando" ? "Editando com IA…" : v.status === "pronto" ? "Editado" : v.status === "erro" ? "Edição falhou" : "Recebido"}
+                          </span>
+                          {v.descricao && <small className="dica">{v.descricao}</small>}
+                          {v.erro_msg && <small className="dica">{v.erro_msg}</small>}
+                          <div className="acoes">
+                            {!v.post_id && v.status !== "editando" && (
+                              <form action={transformarEmReels}><input type="hidden" name="id" value={v.id} /><Botao className="btn sm">Criar reels</Botao></form>
+                            )}
+                            {!v.post_id && (
+                              <form action={removerVideo}><input type="hidden" name="id" value={v.id} /><Botao className="btn sm ghost">Apagar</Botao></form>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <EnviarVideo restantes={MAX_VIDEOS_MES - enviadosNoMes} maxSegundos={MAX_SEGUNDOS} maxMb={MAX_MB} tipos={TIPOS_VIDEO} />
+                </>
+              ) : null}
+            </div>
+            )}
           </>
         )}
 
@@ -247,7 +298,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
               return (
                 <div className="card post" key={p.id} id={`post-${p.id}`}>
                   <div className="arte">
-                    {p.imagem_url ? (
+                    {p.video_url ? (
+                      <video src={p.video_url} controls playsInline preload="metadata" aria-label={`Reels: ${p.titulo_arte ?? ""}`} />
+                    ) : p.imagem_url ? (
                       <VerPost imagem={p.imagem_url} titulo={p.titulo_arte ?? ""} legenda={p.legenda} hashtags={p.hashtags ?? []}
                         perfil={conta?.ig_username ?? undefined} quando={quando(p.agendado_para)}>
                         {editavel && p.status !== "aprovado" && (
@@ -273,7 +326,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                     {p.erro_msg && <p className="erro">{p.erro_msg}</p>}
                     {editavel && (
                       <div className="acoes">
-                        {(assinante ? (artes.porPost[p.id] ?? 0) < ARTES_POR_POST : artes.noMes < ARTES_DEMO) ? (
+                        {p.video_url ? null : (assinante ? (artes.porPost[p.id] ?? 0) < ARTES_POR_POST : artes.noMes < ARTES_DEMO) ? (
                           <form action={gerarImagemPost}>
                             <input type="hidden" name="id" value={p.id} />
                             <Botao className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>
@@ -285,7 +338,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                             ? <span className="badge cinza">Limite de artes deste post</span>
                             : <span className="assine">Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.</span>
                         )}
-                        {assinante && conta && p.imagem_url && (
+                        {assinante && conta && (p.imagem_url || p.video_url) && (
                           <form action={publicarAgora}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ig-agora">Publicar agora</Botao></form>
                         )}
                         {p.status !== "aprovado" && (
