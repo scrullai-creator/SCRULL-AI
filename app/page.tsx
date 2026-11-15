@@ -27,7 +27,8 @@ const DUVIDAS = [
   ["Preciso mandar fotos?", "Não. A Scrull cria a arte de cada post sozinha, com as cores e o nome da sua marca. Se quiser enviar a sua logo, ela entra em todas as artes."],
   ["E se eu não gostar de um post?", "Você escolhe: pode aprovar cada post antes de ir ao ar, editar a legenda ou pedir outra arte. Quem prefere não ter trabalho nenhum deixa tudo no automático."],
   ["Tem fidelidade?", "Não. A assinatura é mensal e você cancela quando quiser."],
-  ["A demonstração é grátis mesmo?", "É. Você cria a sua primeira semana de posts sem pagar nada e sem cartão. Só assina se quiser que a Scrull publique para você."],
+  ["Como eu pago?", "Pelo cartão de crédito, com cobrança mensal automática pelo Mercado Pago. É seguro e o Scrull não vê os dados do seu cartão."],
+  ["A demonstração é grátis mesmo?", "É. Você cria a sua primeira semana de posts sem pagar nada. Só assina se quiser que a Scrull publique para você."],
 ];
 
 export default function Inicio() {
@@ -49,7 +50,7 @@ export default function Inicio() {
           Você aparece, é lembrado e segue cuidando do que importa.
         </p>
         <a href={CADASTRO} className="lp-btn">Criar minha semana de posts grátis</a>
-        <p className="lp-mini">Sem cartão. Leva 2 minutos.</p>
+        <p className="lp-mini">Demonstração grátis. Leva 2 minutos.</p>
       </section>
 
       <section className="lp-sec">

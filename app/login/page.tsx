@@ -150,7 +150,7 @@ export default function Login() {
             )}
             <div className="sl-divider" />
             <div className="sl-trust">
-              <div className="sl-trust-item"><div className="sl-dot" /> Sem cartão de crédito</div>
+              <div className="sl-trust-item"><div className="sl-dot" /> Demonstração grátis</div>
               <div className="sl-trust-item"><div className="sl-dot" /> Cancele quando quiser</div>
             </div>
           </div>

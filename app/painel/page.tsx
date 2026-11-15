@@ -145,7 +145,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                   </form>
                 ))}
               </div>
-              <small className="dica">Pagamento seguro pelo Mercado Pago. O Scrull não vê os dados do seu cartão.</small>
+              <small className="dica">Pague no cartão de crédito, com segurança pelo Mercado Pago. O Scrull não vê os dados do seu cartão. Cancele quando quiser.</small>
             </div>
           </>
         )}
