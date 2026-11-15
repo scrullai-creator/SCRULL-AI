@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgora } from "./gerar";
+import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgora, assinar, cancelar } from "./gerar";
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
 import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
@@ -18,6 +18,12 @@ const AVISOS: Record<string, [string, boolean]> = {
   "pub-ok": ["Post publicado no Instagram!", true],
   "pub-erro": ["Não foi possível publicar agora. Veja o motivo no post e tente de novo.", false],
   "pub-assine": ["Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.", false],
+  "assin-ok": ["Assinatura confirmada! A Scrull já pode publicar para você.", true],
+  "assin-pendente": ["Estamos aguardando a confirmação do pagamento. Assim que o Mercado Pago confirmar, sua conta é ativada.", false],
+  "assin-erro": ["Não foi possível abrir o pagamento agora. Tente de novo em instantes.", false],
+  "assin-breve": ["A assinatura online estará disponível em breve. Fale com a gente para ativar o seu plano.", false],
+  "cancel-ok": ["Assinatura cancelada. Seus posts ficam guardados caso você volte.", true],
+  "cancel-erro": ["Não foi possível cancelar agora. Tente de novo em instantes.", false],
   "demo-usada": ["Sua semana grátis já foi criada. Assine para criar novas semanas, liberar todas as artes e publicar.", false],
   "img-limite": [`Limite de artes atingido: cada post pode ter até ${ARTES_POR_POST} artes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
   "perfil-ok": ["Briefing salvo! Agora a Scrull conhece a sua marca.", true],
@@ -56,7 +62,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: cliente }, { data: cfg }, { data: contas }, { data: posts }] = await Promise.all([
+  const [{ data: cliente }, { data: cfg }, { data: contas }, { data: posts }, { data: planos }] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", user.id).single(),
     supabase.from("configuracoes").select("*").eq("cliente_id", user.id).single(),
     supabase.from("contas_instagram").select("id, ig_username")
@@ -64,7 +70,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
     supabase.from("posts").select("*").eq("cliente_id", user.id)
       .gte("agendado_para", new Date().toISOString())
       .order("agendado_para").limit(14),
+    supabase.from("planos").select("id, nome, preco_centavos, preco_cheio_centavos, posts_por_semana").eq("ativo", true).order("preco_centavos"),
   ]);
+  const reais = (c: number) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const conta = contas?.[0];
   const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
@@ -109,6 +117,31 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
             </>
           )}
         </div>
+
+        {!assinante && !!posts?.length && (
+          <>
+            <h2>Assine e deixe no automático</h2>
+            <div className="card">
+              <p className="sub" style={{ marginTop: 0 }}>
+                Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo. Sem fidelidade: cancele quando quiser.
+              </p>
+              <div className="planos">
+                {(planos ?? []).map((pl) => (
+                  <form action={assinar} className="plano" key={pl.id}>
+                    <input type="hidden" name="plano" value={pl.id} />
+                    <b>{pl.nome}</b>
+                    <span className="preco">
+                      {pl.preco_cheio_centavos ? <s>{reais(pl.preco_cheio_centavos)}</s> : null} {reais(pl.preco_centavos)}<small>/mês</small>
+                    </span>
+                    <small>{pl.posts_por_semana >= 7 ? "1 post por dia, todos os dias" : `${pl.posts_por_semana} posts por semana`}</small>
+                    <button className="btn">Assinar {pl.nome}</button>
+                  </form>
+                ))}
+              </div>
+              <small className="dica">Pagamento seguro pelo Mercado Pago. O Scrull não vê os dados do seu cartão.</small>
+            </div>
+          </>
+        )}
 
         {(
           <>
@@ -240,6 +273,13 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
           <Chave campo="melhor_horario" valor={cfg?.melhor_horario ?? true} titulo="Escolher o melhor horário" descricao="Usa os horários em que seus seguidores estão online." />
           <Chave campo="pausado" valor={!!cfg?.pausado} titulo="Pausar publicações" descricao="Nenhum post sai enquanto estiver ligado." />
         </div>
+        {assinante && cliente?.mp_assinatura_id && (
+          <details className="card cancelar">
+            <summary>Cancelar assinatura</summary>
+            <p className="sub" style={{ marginTop: 10 }}>Ao cancelar, a cobrança mensal para e a Scrull deixa de publicar. Seus posts ficam guardados.</p>
+            <form action={cancelar}><button className="btn ghost">Confirmar cancelamento</button></form>
+          </details>
+        )}
       </main>
     </>
   );

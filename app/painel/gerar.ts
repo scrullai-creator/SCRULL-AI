@@ -6,6 +6,7 @@ import { criarPosts } from "@/lib/gerar-posts";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
 import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
 import { publicarPost } from "@/lib/publicar";
+import { criarAssinatura, cancelarAssinatura, pagamentoConfigurado } from "@/lib/mercadopago";
 
 const HORAS = ["19:00", "12:00", "11:30", "18:30", "19:00", "12:30", "19:00"];
 
@@ -167,4 +168,34 @@ export async function publicarAgora(f: FormData) {
   }
   revalidatePath("/painel");
   redirect(`/painel?ig=${resultado}#post-${id}`);
+}
+
+// Assinatura ------------------------------------------------------------------
+export async function assinar(f: FormData) {
+  const { user } = await usuarioLogado();
+  const planoId = String(f.get("plano") ?? "");
+  let destino = "/painel?ig=assin-erro";
+  if (!pagamentoConfigurado()) {
+    destino = "/painel?ig=assin-breve";
+  } else {
+    try {
+      destino = await criarAssinatura({ clienteId: user.id, email: user.email ?? "", planoId });
+    } catch (e) {
+      console.error("Erro ao criar assinatura:", e);
+    }
+  }
+  redirect(destino);
+}
+
+export async function cancelar() {
+  const { user } = await usuarioLogado();
+  let resultado = "cancel-erro";
+  try {
+    await cancelarAssinatura(user.id);
+    resultado = "cancel-ok";
+  } catch (e) {
+    console.error("Erro ao cancelar assinatura:", e);
+  }
+  revalidatePath("/painel");
+  redirect(`/painel?ig=${resultado}`);
 }
