@@ -65,7 +65,7 @@ export async function publicarPost(postId: string, clienteId: string) {
       if (st.status_code === "FINISHED") { pronto = true; break; }
       if (st.status_code === "ERROR" || st.status_code === "EXPIRED") {
         if (ehVideo) await db.from("posts").update({ ig_container_id: null }).eq("id", postId);
-        throw new Error(ehVideo ? "O Instagram não conseguiu processar o vídeo (use MP4 ou MOV, na vertical, de 3 s a 90 s)" : "O Instagram não conseguiu processar a imagem");
+        throw new Error(ehVideo ? "O Instagram não conseguiu processar o vídeo (use MP4 ou MOV, na vertical, de 3 s a 8 s)" : "O Instagram não conseguiu processar a imagem");
       }
       await esperar(ehVideo ? 3000 : 2000);
     }

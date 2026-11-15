@@ -10,7 +10,7 @@ import { briefingParaPrompt, lerBriefing } from "./briefing";
 
 const PASTA = "artes";
 export const MAX_VIDEOS_MES = 4;           // por cliente, no plano Premium
-export const MAX_SEGUNDOS = 90;            // reels curtos: até 1 minuto e meio
+export const MAX_SEGUNDOS = 8;             // reels curtinhos: até 8 segundos
 export const MAX_MB = 50;                  // limite de arquivo do Storage no plano grátis do Supabase
 export const TIPOS_VIDEO = ["video/mp4", "video/quicktime"];
 
