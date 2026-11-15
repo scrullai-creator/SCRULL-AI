@@ -38,7 +38,14 @@ export default function Login() {
       const { data, error } = await supabaseNavegador().auth.signUp({
         email, password: senha, options: { data: { nome_empresa: nome.trim() } },
       });
-      if (error) return setErro("Não foi possível criar a conta. Confira os dados.");
+      if (error) {
+        const m = `${error.code ?? ""} ${error.message ?? ""}`.toLowerCase();
+        if (m.includes("already") || m.includes("exists")) return setErro("Esse e-mail já tem conta. Use a aba Entrar, ou cadastre com outro e-mail.");
+        if (m.includes("rate") || m.includes("limit") || m.includes("seconds")) return setErro("Muitas tentativas seguidas. Espere um minuto e tente de novo.");
+        if (m.includes("password") || m.includes("weak")) return setErro("Senha fraca. Use pelo menos 8 caracteres, misturando letras e números.");
+        if (m.includes("email") && m.includes("invalid")) return setErro("Esse e-mail não parece válido. Confira se digitou certo.");
+        return setErro(`Não foi possível criar a conta: ${error.message}`);
+      }
       if (!data.session) return setMsg("Quase lá! Verifique seu e-mail para confirmar a conta.");
       router.push("/painel");
       router.refresh();
