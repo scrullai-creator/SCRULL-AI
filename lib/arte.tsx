@@ -37,9 +37,13 @@ function Check({ cor }: { cor: string }) {
   );
 }
 
+export type Layout = "faixa" | "centro" | "cartao" | "frase";
+
 export type DadosArte = {
   fundoJpeg: Buffer;          // foto gerada pela IA
+  layout?: Layout;
   titulo: string;
+  subtitulo?: string;
   topicos: string[];
   logo?: { bytes: Buffer; tipo: string } | null;
   nomeEmpresa: string;
@@ -54,20 +58,72 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
   const titulo = d.titulo.trim();
   const tamTitulo = titulo.length > 28 ? 60 : titulo.length > 18 ? 72 : 84;
 
-  const png = new ImageResponse(
-    (
+  const W = TAM;
+  const sombra = "0 4px 18px rgba(0,0,0,0.45)";
+  const marca = logo ? (
+    <div style={{ display: "flex", padding: 12, borderRadius: 20, background: "rgba(255,255,255,0.92)" }}>
+      <img src={logo} width={104} height={104} style={{ objectFit: "contain" }} />
+    </div>
+  ) : (
+    <div style={{ display: "flex", fontSize: 28, fontWeight: 800, letterSpacing: 1, textShadow: "0 2px 10px rgba(0,0,0,0.6)" }}>
+      {d.nomeEmpresa.toUpperCase()}
+    </div>
+  );
+  const sub = (d.subtitulo ?? "").trim();
+  const layout = d.layout ?? "faixa";
+
+  let arte: React.ReactElement;
+  if (layout === "centro") {
+    arte = (
+      <div style={{ width: W, height: W, display: "flex", position: "relative", fontFamily: "Jakarta", color: "#fff" }}>
+        <img src={fundo} width={W} height={W} style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, width: W, height: W, display: "flex", background: "rgba(0,0,0,0.5)" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, width: W, height: W, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", padding: "0 90px", textAlign: "center" }}>
+          <div style={{ display: "flex", width: 90, height: 8, borderRadius: 8, background: d.cor === "#0b1437" ? "#fff" : d.cor, marginBottom: 34 }} />
+          <div style={{ display: "flex", fontSize: tamTitulo + 6, fontWeight: 800, lineHeight: 1.05, letterSpacing: -1.5, textShadow: sombra, justifyContent: "center" }}>{titulo}</div>
+          {sub && <div style={{ display: "flex", fontSize: 34, fontWeight: 700, marginTop: 26, opacity: 0.92, textShadow: sombra, justifyContent: "center" }}>{sub}</div>}
+        </div>
+        <div style={{ position: "absolute", left: 0, bottom: 44, width: W, display: "flex", justifyContent: "center" }}>{marca}</div>
+      </div>
+    );
+  } else if (layout === "cartao") {
+    const alt = 600;
+    arte = (
+      <div style={{ width: W, height: W, display: "flex", flexDirection: "column", fontFamily: "Jakarta", color: "#fff", background: d.cor }}>
+        <img src={fundo} width={W} height={alt} style={{ objectFit: "cover" }} />
+        <div style={{ display: "flex", flex: 1, padding: "38px 56px", alignItems: "center", justifyContent: "space-between", gap: 30 }}>
+          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            <div style={{ display: "flex", fontSize: Math.min(tamTitulo, 66), fontWeight: 800, lineHeight: 1.06, letterSpacing: -1.2 }}>{titulo}</div>
+            {sub && <div style={{ display: "flex", fontSize: 30, fontWeight: 700, marginTop: 14, opacity: 0.85 }}>{sub}</div>}
+          </div>
+          {marca}
+        </div>
+      </div>
+    );
+  } else if (layout === "frase") {
+    arte = (
+      <div style={{ width: W, height: W, display: "flex", position: "relative", fontFamily: "Jakarta", color: "#fff", background: d.cor }}>
+        <img src={fundo} width={W} height={W} style={{ position: "absolute", top: 0, left: 0, objectFit: "cover", opacity: 0.22 }} />
+        <div style={{ position: "absolute", top: 0, left: 0, width: W, height: W, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 96px" }}>
+          <div style={{ display: "flex", fontSize: 220, fontWeight: 800, lineHeight: 0.6, opacity: 0.35, marginBottom: 10 }}>“</div>
+          <div style={{ display: "flex", fontSize: tamTitulo + 4, fontWeight: 800, lineHeight: 1.1, letterSpacing: -1.2 }}>{titulo}</div>
+          {sub && <div style={{ display: "flex", fontSize: 32, fontWeight: 700, marginTop: 24, opacity: 0.85 }}>{sub}</div>}
+        </div>
+        <div style={{ position: "absolute", right: 56, bottom: 52, display: "flex" }}>{marca}</div>
+      </div>
+    );
+  } else {
+    arte = (
       <div style={{ width: TAM, height: TAM, display: "flex", position: "relative", fontFamily: "Jakarta", color: "#fff" }}>
         <img src={fundo} width={TAM} height={TAM} style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }} />
-        {/* escurece a base para o texto ler bem */}
         <div style={{ position: "absolute", top: 0, left: 0, width: TAM, height: TAM, display: "flex",
           background: "linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.72) 72%, rgba(0,0,0,0.9) 100%)" }} />
-        {/* faixa diagonal na cor da marca */}
         <div style={{ position: "absolute", top: 0, left: 0, width: TAM, height: TAM, display: "flex",
           background: `linear-gradient(35deg, ${d.cor}f2 0%, ${d.cor}d9 28%, ${d.cor}66 48%, ${d.cor}00 64%)` }} />
-        {/* texto */}
         <div style={{ position: "absolute", left: 64, bottom: 64, width: 760, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", fontSize: tamTitulo, fontWeight: 800, lineHeight: 1.05, letterSpacing: -1.5,
-            textShadow: "0 4px 18px rgba(0,0,0,0.45)", marginBottom: 26 }}>{titulo}</div>
+            textShadow: sombra, marginBottom: 26 }}>{titulo}</div>
           {d.topicos.slice(0, 3).map((t) => (
             <div key={t} style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 32, fontWeight: 700, marginTop: 10,
               textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>
@@ -76,18 +132,13 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
             </div>
           ))}
         </div>
-        {/* logo ou nome da empresa */}
-        {logo ? (
-          <div style={{ position: "absolute", right: 48, bottom: 48, display: "flex", padding: 14, borderRadius: 22,
-            background: "rgba(255,255,255,0.92)" }}>
-            <img src={logo} width={120} height={120} style={{ objectFit: "contain" }} />
-          </div>
-        ) : (
-          <div style={{ position: "absolute", right: 56, bottom: 56, display: "flex", fontSize: 30, fontWeight: 800,
-            letterSpacing: 1, textShadow: "0 2px 10px rgba(0,0,0,0.6)" }}>{d.nomeEmpresa.toUpperCase()}</div>
-        )}
+        <div style={{ position: "absolute", right: 48, bottom: 48, display: "flex" }}>{marca}</div>
       </div>
-    ),
+    );
+  }
+
+  const png = new ImageResponse(
+    arte,
     {
       width: TAM, height: TAM,
       fonts: [

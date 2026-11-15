@@ -78,7 +78,7 @@ export async function contarArtes(clienteId: string) {
 export async function gerarArteDoPost(postId: string, clienteId: string) {
   const db = supabaseAdmin();
   const [{ data: post }, { data: cliente }, contagem] = await Promise.all([
-    db.from("posts").select("id, prompt_imagem, titulo_arte, topicos").eq("id", postId).eq("cliente_id", clienteId).single(),
+    db.from("posts").select("id, prompt_imagem, titulo_arte, topicos, layout, subtitulo").eq("id", postId).eq("cliente_id", clienteId).single(),
     db.from("clientes").select("logo_url, nome_empresa, assinatura, briefing, planos(posts_por_semana)").eq("id", clienteId).single(),
     contarArtes(clienteId),
   ]);
@@ -100,6 +100,7 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const [foto, logo] = await Promise.all([gerarFoto(cena), lerLogo(cliente?.logo_url)]);
   const bytes = await montarArte({
     fundoJpeg: foto, titulo: post.titulo_arte ?? cliente?.nome_empresa ?? "", topicos: post.topicos ?? [],
+    layout: (post.layout as any) ?? "faixa", subtitulo: post.subtitulo ?? "",
     logo, nomeEmpresa: cliente?.nome_empresa ?? "", cor: corDaMarca(lerBriefing(cliente?.briefing).cores),
   });
   const url = await guardarArquivo(`${clienteId}/${postId}-${Date.now()}.jpg`, bytes, "image/jpeg");

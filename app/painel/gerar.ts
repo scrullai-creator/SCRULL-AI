@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
 import { criarPosts } from "@/lib/gerar-posts";
+import { lerPerfil, resumoDoPerfil } from "@/lib/instagram-leitura";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
 import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
 import { publicarPost } from "@/lib/publicar";
@@ -82,7 +83,11 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
       .neq("status", "recusado").order("criado_em", { ascending: false }).limit(20),
   ]);
   const qtd = plano?.posts_por_semana ?? 7;
+  // Lê o Instagram do cliente (se conectado) para manter a voz da marca e aprender com o que funciona
+  const perfil = await lerPerfil(userId);
+  const fotosDoPerfil = perfil.filter((p) => p.imagem).slice(0, 6).map((p) => p.imagem!) ;
   const lista = await criarPosts({
+    perfil: resumoDoPerfil(perfil), fotosDoPerfil,
     empresa: cliente.nome_empresa, ramo: cliente.ramo, tom: cliente.tom_de_voz, quantidade: qtd,
     briefing: lerBriefing(cliente.briefing), temLogo: !!cliente.logo_url,
     historico: (recentes ?? []).map((p) => ({ titulo: p.titulo_arte ?? "", tema: p.tema })),
@@ -92,6 +97,7 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
   const { error } = await db.from("posts").insert(
     lista.map((p, i) => ({
       cliente_id: userId, conta_id: conta?.id ?? null, titulo_arte: p.titulo, topicos: p.topicos, tema: p.tema,
+      layout: p.layout, subtitulo: p.subtitulo || null,
       legenda: p.legenda, hashtags: p.hashtags, prompt_imagem: p.prompt_imagem,
       agendado_para: horario(1 + i * passo, HORAS[i % HORAS.length]), status,
     }))

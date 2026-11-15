@@ -217,6 +217,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                     {p.imagem_url ? <img src={p.imagem_url} alt={p.titulo_arte ?? ""} /> : (
                       <div>
                         <b>{p.titulo_arte}</b>
+                        {p.subtitulo && <span>{p.subtitulo}</span>}
                         {!!p.topicos?.length && <ul>{p.topicos.map((t: string) => <li key={t}>✓ {t}</li>)}</ul>}
                       </div>
                     )}

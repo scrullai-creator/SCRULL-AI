@@ -5,9 +5,14 @@ import { type Briefing, briefingParaPrompt } from "./briefing";
 
 const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-haiku-5-5";
 
+export const LAYOUTS = ["faixa", "centro", "cartao", "frase"] as const;
+export type Layout = (typeof LAYOUTS)[number];
+
 export type PostGerado = {
   tema: string;
+  layout: Layout;
   titulo: string;
+  subtitulo: string;
   topicos: string[];
   legenda: string;
   hashtags: string[];
@@ -23,6 +28,9 @@ export type DadosParaGerar = {
   temLogo: boolean;
   // Posts recentes (título e tema), para não repetir assunto
   historico: { titulo: string; tema?: string | null }[];
+  // Resumo do Instagram do cliente (legendas e engajamento) e fotos de referência
+  perfil?: string;
+  fotosDoPerfil?: string[];
 };
 
 // A IA às vezes escreve algo antes ou depois do JSON, ou é cortada no meio.
@@ -59,30 +67,47 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     ? a.historico.map((p) => `- ${p.titulo}${p.tema ? ` (${p.tema})` : ""}`).join("\n")
     : "(nenhum post ainda: esta é a primeira semana da conta, então apresente a empresa)";
   const sistema =
-    `Você é a social media sênior de uma agência brasileira que cuida do Instagram de pequenos negócios. ` +
-    `Você conhece a empresa a fundo pelo briefing e planeja o feed como uma estratégia, não como posts soltos. ` +
-    `Escreve em português do Brasil, com naturalidade, sem clichês de IA. ` +
+    `Você é a social media criativa de uma agência brasileira que cuida do Instagram de pequenos negócios. ` +
+    `Você conhece a empresa pelo briefing e pelo próprio Instagram dela, e planeja o feed como uma conversa com o público, ` +
+    `não como uma linha de produção. Escreve em português do Brasil como gente de verdade escreve no Instagram: ` +
+    `com calor, ritmo e personalidade, sem soar robótico, sem fórmula repetida, sem clichês de IA ("no mundo de hoje", ` +
+    `"potencialize", "descubra", "transforme"). ` +
     `Nunca inventa preços, endereços, telefones, números de clientes, prêmios ou depoimentos. ` +
     `Só fala de oferta se o briefing tiver uma. Responde SOMENTE com JSON válido.`;
 
   const usuario =
     `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\nHOJE: ${hoje}\n\n` +
     `BRIEFING DA MARCA:\n${briefingParaPrompt(a.briefing)}\n\n` +
-    `POSTS RECENTES (não repita estes assuntos):\n${historico}\n\n` +
-    `TAREFA: crie ${a.quantidade} posts de feed para a próxima semana, todos com temas diferentes entre si e ` +
-    `diferentes dos recentes. Varie os formatos ao longo da semana: apresentação/produto, dica útil, bastidores, ` +
-    `história da marca, pergunta ao público, quebra de objeção, prova (só com fatos do briefing), carrossel de passos, ` +
-    `data comemorativa próxima se fizer sentido. No máximo 1 post de oferta, e só se houver oferta no briefing.\n\n` +
+    `O INSTAGRAM ATUAL DA EMPRESA (aprenda a voz, os assuntos e o que o público mais curte; ` +
+    `mantenha o que funciona, melhore o resto, não copie frases):\n${a.perfil ?? "(perfil não conectado)"}\n` +
+    (a.fotosDoPerfil?.length ? `As imagens anexadas são fotos reais do perfil: use-as para entender o produto, o ambiente e o estilo visual da marca.\n` : "") +
+    `\nPOSTS JÁ CRIADOS PELO SCRULL (não repita estes assuntos):\n${historico}\n\n` +
+    `TAREFA: crie ${a.quantidade} posts de feed para os próximos dias. Cada post precisa parecer diferente do anterior, ` +
+    `no assunto, no formato da arte e no jeito da legenda.\n\n` +
+    `VARIEDADE OBRIGATÓRIA:\n` +
+    `- Assuntos: misture produto em destaque, bastidores, dica útil, curiosidade, história da marca, pergunta ao público, ` +
+    `quebra de objeção, data comemorativa próxima (se fizer sentido), humor leve do dia a dia do ramo, prova real (só com fatos do briefing). ` +
+    `No máximo 1 post de oferta, e só se houver oferta no briefing.\n` +
+    `- "layout" da arte, alternando e nunca repetindo o mesmo em dois posts seguidos:\n` +
+    `  "faixa" = foto com título grande e até 3 tópicos curtos (bom para listas e benefícios);\n` +
+    `  "centro" = foto marcante com uma frase forte centralizada (bom para emoção, novidade, convite);\n` +
+    `  "cartao" = foto em cima e um bloco de cor embaixo com título e subtítulo (bom para dica e informação);\n` +
+    `  "frase" = fundo na cor da marca com uma frase grande, estilo citação (bom para reflexão, humor, pergunta).\n` +
+    `- Legendas: varie o tamanho (algumas de 1 ou 2 linhas, outras com 3 ou 4 parágrafos curtos), o começo ` +
+    `(nem sempre pergunta, nem sempre "Você sabia"), o final (convite, pergunta, frase de efeito, chamada para o direct) ` +
+    `e o uso de emoji conforme o tom e o que o perfil já usa.\n\n` +
     `Para cada post, devolva um objeto com:\n` +
-    `- "tema": 2 a 4 palavras resumindo o assunto (ex.: "dica de horário", "história da fundadora")\n` +
-    `- "titulo": o texto grande da arte, até 5 palavras, forte e direto\n` +
-    `- "topicos": exatamente 3 itens curtos (2 a 4 palavras cada) que aparecem na arte com um ícone de check\n` +
-    `- "legenda": 3 parágrafos curtos separados por linha em branco (total até 400 caracteres): o gancho, ` +
-    `o valor para o cliente e a chamada para ação ou pergunta. Sem hashtags dentro da legenda.\n` +
-    `- "hashtags": array de 5 hashtags, misturando o nome da marca, o ramo e o assunto\n` +
-    `- "prompt_imagem": descrição em INGLÊS, de 1 a 2 frases, de uma FOTO realista para o fundo da arte, ligada ao assunto do post e ao ramo da empresa ` +
-    `(ex.: a scene, an object, a place, hands working; sem rostos famosos, sem marcas conhecidas, SEM texto ou logos na cena). ` +
-    `O título, os tópicos e a logo serão escritos por cima depois, então não os descreva.\n\n` +
+    `- "tema": 2 a 4 palavras resumindo o assunto\n` +
+    `- "layout": um de "faixa", "centro", "cartao", "frase"\n` +
+    `- "titulo": o texto grande da arte, até 7 palavras, com personalidade\n` +
+    `- "subtitulo": uma linha curta de apoio (até 10 palavras) para "centro" e "cartao"; vazio nos outros\n` +
+    `- "topicos": para "faixa", de 2 a 3 itens curtos (2 a 4 palavras); para os outros layouts, lista vazia\n` +
+    `- "legenda": o texto do post, até 600 caracteres, sem hashtags dentro\n` +
+    `- "hashtags": de 3 a 6 hashtags, misturando o nome da marca, o ramo, o assunto e a cidade se o briefing disser\n` +
+    `- "prompt_imagem": em INGLÊS, 1 a 2 frases descrevendo uma FOTO realista para a arte, ligada ao assunto e ao produto real ` +
+    `da empresa (use as fotos do perfil como referência de produto e ambiente), variando enquadramento, luz e cenário entre os posts ` +
+    `(close de produto, ambiente, mãos trabalhando, detalhe, vista de cima, pessoa de costas). Sem rostos famosos, sem marcas conhecidas, ` +
+    `SEM texto ou logos na cena. Para "frase", descreva uma textura ou detalhe sutil do ramo.\n\n` +
     `Responda SOMENTE um array JSON com ${a.quantidade} objetos, sem comentários.`;
 
   return { sistema, usuario };
@@ -91,20 +116,34 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
 export async function criarPosts(a: DadosParaGerar): Promise<PostGerado[]> {
   const { sistema, usuario } = montarPrompt(a);
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODELO,
-      max_tokens: 8000,
-      system: sistema,
-      messages: [{ role: "user", content: usuario }],
-    }),
-  });
+  const chamar = (comFotos: boolean) => {
+    const fotos = comFotos ? (a.fotosDoPerfil ?? []).slice(0, 6) : [];
+    const content = fotos.length
+      ? [...fotos.map((url) => ({ type: "image", source: { type: "url", url } })), { type: "text", text: usuario }]
+      : usuario;
+    return fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: MODELO,
+        max_tokens: 8000,
+        temperature: 1,
+        system: sistema,
+        messages: [{ role: "user", content }],
+      }),
+    });
+  };
+
+  let res = await chamar(true);
+  // Se alguma foto do perfil não abrir, tenta de novo só com o texto
+  if (res.status === 400 && a.fotosDoPerfil?.length) {
+    console.error("Criação com fotos do perfil falhou; tentando só com texto");
+    res = await chamar(false);
+  }
   if (!res.ok) {
     // Registra o motivo que a API informou (não contém a chave) para facilitar o diagnóstico
     const erro = await res.json().catch(() => null);
@@ -121,9 +160,11 @@ export async function criarPosts(a: DadosParaGerar): Promise<PostGerado[]> {
   }
 
   const limpar = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
-  return lista.slice(0, a.quantidade).map((p: any) => ({
+  return lista.slice(0, a.quantidade).map((p: any, i: number) => ({
     tema: limpar(p.tema, 60),
-    titulo: limpar(p.titulo, 60),
+    layout: (LAYOUTS as readonly string[]).includes(p.layout) ? p.layout : LAYOUTS[i % LAYOUTS.length],
+    titulo: limpar(p.titulo, 80),
+    subtitulo: limpar(p.subtitulo, 90),
     topicos: (Array.isArray(p.topicos) ? p.topicos : []).map((t: unknown) => limpar(t, 40)).filter(Boolean).slice(0, 3),
     legenda: limpar(p.legenda, 2000),
     hashtags: (Array.isArray(p.hashtags) ? p.hashtags : [])
