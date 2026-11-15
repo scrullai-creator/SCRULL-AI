@@ -221,6 +221,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
               )}
               <EnviarFotos vagas={MAX_FOTOS - fotos.length} />
             </div>
+            {comVideos && (
             <div className="card">
               <b>Seus vídeos</b>
               {comVideos ? (
@@ -254,12 +255,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                   )}
                   <EnviarVideo restantes={MAX_VIDEOS_MES - enviadosNoMes} maxSegundos={MAX_SEGUNDOS} maxMb={MAX_MB} tipos={TIPOS_VIDEO} />
                 </>
-              ) : (
-                <p className="sub" style={{ margin: "6px 0 0" }}>
-                  Em breve no plano Premium: envie vídeos do seu dia a dia e a Scrull transforma em reels prontos, com legenda e tudo.
-                </p>
-              )}
+              ) : null}
             </div>
+            )}
           </>
         )}
 

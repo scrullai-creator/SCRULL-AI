@@ -16,9 +16,11 @@ export const TIPOS_VIDEO = ["video/mp4", "video/quicktime"];
 
 export const edicaoConfigurada = () => !!process.env.SUBMAGIC_API_KEY;
 
-// Quem pode usar vídeos: plano Premium com assinatura ativa, ou a dona do app
-export function podeUsarVideos(c: { plano_id?: string | null; assinatura?: string | null } | null, ehDono: boolean) {
-  return ehDono || (c?.plano_id === "premium" && c?.assinatura === "ativa");
+// Quem pode usar vídeos: por enquanto, só a dona do app (fase de testes).
+// Para liberar ao plano Premium depois, troque por:
+//   return ehDono || (c?.plano_id === "premium" && c?.assinatura === "ativa");
+export function podeUsarVideos(_c: { plano_id?: string | null; assinatura?: string | null } | null, ehDono: boolean) {
+  return ehDono;
 }
 
 export async function videosDoMes(clienteId: string) {

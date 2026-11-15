@@ -36,6 +36,4 @@ alter table posts add column if not exists ig_container_id text;
 
 notify pgrst, 'reload schema';
 
--- Vídeos ficam liberados para o plano Premium (e para a conta da dona do app).
--- Para liberar uma conta piloto, troque o nome e rode a linha abaixo sem os "--":
--- update clientes set plano_id = 'premium' where nome_empresa ilike '%romana%';
+-- Por enquanto os vídeos aparecem só para a dona do app (fase de testes).
