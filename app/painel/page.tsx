@@ -3,6 +3,7 @@ import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgor
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
 import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
+import { VerPost } from "./ver-post";
 import { aprovarPost, recusarPost, aprovarTodos, salvarLegenda, alternarConfig, sair } from "./actions";
 
 // Gerar a arte pode levar até ~40 s
@@ -214,7 +215,17 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
               return (
                 <div className="card post" key={p.id} id={`post-${p.id}`}>
                   <div className="arte">
-                    {p.imagem_url ? <img src={p.imagem_url} alt={p.titulo_arte ?? ""} /> : (
+                    {p.imagem_url ? (
+                      <VerPost imagem={p.imagem_url} titulo={p.titulo_arte ?? ""} legenda={p.legenda} hashtags={p.hashtags ?? []}
+                        perfil={conta?.ig_username ?? undefined} quando={quando(p.agendado_para)}>
+                        {editavel && p.status !== "aprovado" && (
+                          <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><button className="btn">Aprovar este post</button></form>
+                        )}
+                        {editavel && p.status !== "recusado" && (
+                          <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><button className="btn ghost">Recusar</button></form>
+                        )}
+                      </VerPost>
+                    ) : (
                       <div>
                         <b>{p.titulo_arte}</b>
                         {p.subtitulo && <span>{p.subtitulo}</span>}
