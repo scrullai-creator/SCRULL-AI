@@ -48,6 +48,7 @@ export type DadosArte = {
   logo?: { bytes: Buffer; tipo: string } | null;
   nomeEmpresa: string;
   cor: string;                // cor de destaque (hex)
+  mascote?: Buffer | null;    // só nos posts institucionais do próprio Scrull
 };
 
 // Devolve a arte final em JPEG
@@ -71,6 +72,7 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
   );
   const sub = (d.subtitulo ?? "").trim();
   const layout = d.layout ?? "faixa";
+  const mascote = d.mascote ? `data:image/png;base64,${d.mascote.toString("base64")}` : null;
 
   let arte: React.ReactElement;
   if (layout === "centro") {
@@ -133,6 +135,18 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
           ))}
         </div>
         <div style={{ position: "absolute", right: 48, bottom: 48, display: "flex" }}>{marca}</div>
+      </div>
+    );
+  }
+
+  // Posts do próprio Scrull: borda neon e o mascote no canto de cima
+  if (mascote) {
+    arte = (
+      <div style={{ width: TAM, height: TAM, display: "flex", position: "relative" }}>
+        {arte}
+        <div style={{ position: "absolute", top: 0, left: 0, width: TAM, height: TAM, display: "flex",
+          border: "6px solid #c084fc", boxShadow: "inset 0 0 60px rgba(192,132,252,0.55)" }} />
+        <img src={mascote} width={150} height={150} style={{ position: "absolute", top: 36, right: 36 }} />
       </div>
     );
   }

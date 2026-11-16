@@ -97,7 +97,10 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
     throw new LimiteDeArtes(`Limite de ${limiteMes} artes por mês atingido`);
   }
 
-  const cena = post.prompt_imagem || "A clean, modern workspace of a small business owner, warm tones.";
+  // O próprio Scrull (@scrull.ai) tem identidade fixa: roxo escuro com neon e o mascote
+  const ehScrull = /scrull/i.test(cliente?.nome_empresa ?? "");
+  const cena = (post.prompt_imagem || "A clean, modern workspace of a small business owner, warm tones.") +
+    (ehScrull ? " Deep dark purple and violet neon lighting, night mood, modern. No food, no pizza, no robots." : "");
   // Se o cliente enviou fotos, as primeiras artes de cada post usam essas fotos reais (sem custo de IA);
   // as trocas seguintes passam para as outras fotos e, acabando elas, para uma foto gerada.
   const fotosDoCliente = await listarFotos(clienteId).catch(() => []);
@@ -105,11 +108,17 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const gancho = [...postId].reduce((a, c) => a + c.charCodeAt(0), 0);
   const escolhida = fotosDoCliente.length > 0 && usadas < fotosDoCliente.length
     ? await prepararFoto(fotosDoCliente[(gancho + usadas) % fotosDoCliente.length].url) : null;
-  const [foto, logo] = await Promise.all([escolhida ?? gerarFoto(cena), lerLogo(cliente?.logo_url)]);
+  const [foto, logo, mascote] = await Promise.all([
+    // O Scrull não usa as fotos enviadas: a arte dele é sempre gerada no visual da marca
+    (ehScrull ? null : escolhida) ?? gerarFoto(cena),
+    lerLogo(cliente?.logo_url),
+    ehScrull ? lerMascote() : Promise.resolve(null),
+  ]);
   const bytes = await montarArte({
     fundoJpeg: foto, titulo: post.titulo_arte ?? cliente?.nome_empresa ?? "", topicos: post.topicos ?? [],
     layout: escolherLayout(post.layout, gancho, usadas), subtitulo: post.subtitulo ?? "",
-    logo, nomeEmpresa: cliente?.nome_empresa ?? "", cor: corDaMarca(lerBriefing(cliente?.briefing).cores),
+    logo, nomeEmpresa: cliente?.nome_empresa ?? "", mascote,
+    cor: ehScrull ? "#3b0764" : corDaMarca(lerBriefing(cliente?.briefing).cores),
   });
   const url = await guardarArquivo(`${clienteId}/${postId}-${Date.now()}.jpg`, bytes, "image/jpeg");
 
@@ -125,6 +134,11 @@ function escolherLayout(salvo: string | null | undefined, gancho: number, trocas
   const i = FORMATOS.indexOf(salvo as any);
   const base = i >= 0 ? i : gancho % FORMATOS.length;
   return FORMATOS[(base + trocas) % FORMATOS.length];
+}
+
+async function lerMascote() {
+  const res = await fetch(`${process.env.APP_URL}/mascote.png`).catch(() => null);
+  return res?.ok ? Buffer.from(await res.arrayBuffer()) : null;
 }
 
 async function lerLogo(url?: string | null) {
