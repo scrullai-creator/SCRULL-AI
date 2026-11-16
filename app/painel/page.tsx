@@ -172,7 +172,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
               <form action={salvarPerfil}>
                 <label htmlFor="ramo">O que a sua empresa vende?</label>
                 <input id="ramo" name="ramo" className="campo" defaultValue={cliente?.ramo ?? ""}
-                  placeholder="Ex.: pizzaria, loja de roupas" required maxLength={120} />
+                  placeholder="Ex.: loja de roupas, oficina de motos, salão" required maxLength={120} />
                 <label htmlFor="tom">Como você quer falar com seus clientes?</label>
                 <select id="tom" name="tom" className="campo" defaultValue={cliente?.tom_de_voz ?? TONS[0]}>
                   {TONS.map((t) => <option key={t}>{t}</option>)}

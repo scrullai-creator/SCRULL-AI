@@ -105,7 +105,7 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `  "centro" = foto marcante com uma frase forte centralizada (bom para emoção, novidade, convite);\n` +
     `  "cartao" = foto em cima e um bloco de cor embaixo com título e subtítulo (bom para dica e informação);\n` +
     `  "frase" = fundo na cor da marca com uma frase grande, estilo citação (bom para reflexão, humor, pergunta).\n` +
-    `- IDENTIDADE: os posts representam SOMENTE a empresa ${a.empresa}. ` +
+    `- IDENTIDADE: os posts representam SOMENTE a empresa ${a.empresa}, com o estilo do ramo e do perfil DELA. Nunca use como modelo o estilo de outra empresa. ` +
     (/scrull/i.test(a.empresa) ? SCRULL_INSTITUCIONAL :
       `Nunca cite o Scrull AI, nunca use mascote, robô, logotipo ou elementos de identidade do Scrull, e nunca use o roxo/tecnológico do Scrull por padrão: ` +
       `use as cores, o estilo e a linguagem desta empresa (roxo só se o briefing pedir). `) +
@@ -113,6 +113,7 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `- ESTILO DO SEGMENTO (adapte ao ramo da empresa; nunca imponha o visual do Scrull): ` +
     `mercadinho/varejo = cores vibrantes, produtos em destaque, linguagem popular e próxima; ` +
     `confecção/uniformes = produto limpo, detalhe do tecido e da costura, tom profissional; ` +
+    `motos/carros/oficina = a moto ou o carro real em destaque, detalhes de cromado e pintura, estrada, atitude; nunca invente modelo, ano, preço ou condição de pagamento; ` +
     `restaurante/pizzaria/delivery = foto apetitosa, cores quentes, vapor, ingredientes, convite para pedir; ` +
     `beleza/estética = luz suave, tons delicados, elegância e cuidado; ` +
     `tecnologia/educação = tons frios, gradientes, composição moderna e objetiva; ` +

@@ -2,7 +2,9 @@
 // A descrição (prompt) vem do Claude; se o cliente tiver logo, ela vai junto como
 // referência para aparecer igual em todas as artes.
 import { supabaseAdmin } from "./supabase";
-import { montarArte, corDaMarca } from "./arte";
+import { montarArte, corDaMarca, fonteDoRamo } from "./arte";
+import { montarArteScrull, modeloScrull, LUZ_SEM } from "./arte-scrull";
+import sharp from "sharp";
 import { lerBriefing } from "./briefing";
 import { listarFotos, prepararFoto } from "./fotos";
 
@@ -79,8 +81,8 @@ export async function contarArtes(clienteId: string) {
 export async function gerarArteDoPost(postId: string, clienteId: string) {
   const db = supabaseAdmin();
   const [{ data: post }, { data: cliente }, contagem] = await Promise.all([
-    db.from("posts").select("id, prompt_imagem, titulo_arte, topicos, layout, subtitulo").eq("id", postId).eq("cliente_id", clienteId).single(),
-    db.from("clientes").select("logo_url, nome_empresa, assinatura, briefing, planos(posts_por_semana)").eq("id", clienteId).single(),
+    db.from("posts").select("id, prompt_imagem, titulo_arte, topicos, layout, subtitulo, agendado_para").eq("id", postId).eq("cliente_id", clienteId).single(),
+    db.from("clientes").select("logo_url, nome_empresa, ramo, assinatura, briefing, planos(posts_por_semana)").eq("id", clienteId).single(),
     contarArtes(clienteId),
   ]);
   if (!post) throw new Error("Post não encontrado");
@@ -97,29 +99,37 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
     throw new LimiteDeArtes(`Limite de ${limiteMes} artes por mês atingido`);
   }
 
-  // O próprio Scrull (@scrull.ai) tem identidade fixa: roxo escuro com neon e o mascote
-  const ehScrull = /scrull/i.test(cliente?.nome_empresa ?? "");
-  const cena = (post.prompt_imagem || "A clean, modern workspace of a small business owner, warm tones.") +
-    (ehScrull ? " Deep dark purple and violet neon lighting, night mood, modern. No food, no pizza, no robots." : "");
-  // Se o cliente enviou fotos, as primeiras artes de cada post usam essas fotos reais (sem custo de IA);
-  // as trocas seguintes passam para as outras fotos e, acabando elas, para uma foto gerada.
-  const fotosDoCliente = await listarFotos(clienteId).catch(() => []);
   const usadas = contagem.porPost[postId] ?? 0;
   const gancho = [...postId].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const escolhida = fotosDoCliente.length > 0 && usadas < fotosDoCliente.length
-    ? await prepararFoto(fotosDoCliente[(gancho + usadas) % fotosDoCliente.length].url) : null;
-  const [foto, logo, mascote] = await Promise.all([
-    // O Scrull não usa as fotos enviadas: a arte dele é sempre gerada no visual da marca
-    (ehScrull ? null : escolhida) ?? gerarFoto(cena),
-    lerLogo(cliente?.logo_url),
-    ehScrull ? lerMascote() : Promise.resolve(null),
-  ]);
-  const bytes = await montarArte({
-    fundoJpeg: foto, titulo: post.titulo_arte ?? cliente?.nome_empresa ?? "", topicos: post.topicos ?? [],
-    layout: escolherLayout(post.layout, gancho, usadas), subtitulo: post.subtitulo ?? "",
-    logo, nomeEmpresa: cliente?.nome_empresa ?? "", mascote,
-    cor: ehScrull ? "#3b0764" : corDaMarca(lerBriefing(cliente?.briefing).cores),
-  });
+  const cena = post.prompt_imagem || "A clean, modern photo of a small business, natural tones.";
+  let bytes: Buffer;
+
+  if (/scrull/i.test(cliente?.nome_empresa ?? "")) {
+    // O próprio Scrull (@scrull.ai): artes institucionais de tecnologia, com modelo que varia
+    // de um dia para o outro (paleta, fonte e posição do texto). Não usa fotos enviadas.
+    const modelo = modeloScrull(post.agendado_para, usadas);
+    const [foto, mascote] = await Promise.all([gerarFoto(cena + modelo.luz + LUZ_SEM), lerMascote()]);
+    bytes = await montarArteScrull(modelo, {
+      fotoJpeg: foto, titulo: post.titulo_arte ?? "Scrull AI", subtitulo: post.subtitulo ?? "", topicos: post.topicos ?? [], mascote,
+    });
+  } else {
+    // Clientes: cada um com a própria identidade (cores do briefing ou da logo, fonte pelo ramo,
+    // fotos reais que ele enviou). Nada do Scrull e nada de outro cliente entra aqui.
+    // Se o cliente enviou fotos, as primeiras artes de cada post usam essas fotos reais (sem custo de IA);
+    // as trocas seguintes passam para as outras fotos e, acabando elas, para uma foto gerada.
+    const fotosDoCliente = await listarFotos(clienteId).catch(() => []);
+    const escolhida = fotosDoCliente.length > 0 && usadas < fotosDoCliente.length
+      ? await prepararFoto(fotosDoCliente[(gancho + usadas) % fotosDoCliente.length].url) : null;
+    const [foto, logo] = await Promise.all([escolhida ?? gerarFoto(cena), lerLogo(cliente?.logo_url)]);
+    const coresDoBriefing = lerBriefing(cliente?.briefing).cores;
+    bytes = await montarArte({
+      fundoJpeg: foto, titulo: post.titulo_arte ?? cliente?.nome_empresa ?? "", topicos: post.topicos ?? [],
+      layout: escolherLayout(post.layout, gancho, usadas), subtitulo: post.subtitulo ?? "",
+      logo, nomeEmpresa: cliente?.nome_empresa ?? "",
+      cor: coresDoBriefing ? corDaMarca(coresDoBriefing) : (await corDaLogo(logo)) ?? corDaMarca(""),
+      fonteTitulo: fonteDoRamo(cliente?.ramo ?? "", clienteId),
+    });
+  }
   const url = await guardarArquivo(`${clienteId}/${postId}-${Date.now()}.jpg`, bytes, "image/jpeg");
 
   const { error } = await db.from("posts").update({ imagem_url: url }).eq("id", postId);
@@ -134,6 +144,26 @@ function escolherLayout(salvo: string | null | undefined, gancho: number, trocas
   const i = FORMATOS.indexOf(salvo as any);
   const base = i >= 0 ? i : gancho % FORMATOS.length;
   return FORMATOS[(base + trocas) % FORMATOS.length];
+}
+
+// Cor de destaque tirada da logo, quando o briefing não diz as cores da marca.
+// Ignora tons quase brancos ou quase pretos e escurece um pouco para o texto branco ficar legível.
+async function corDaLogo(logo: { bytes: Buffer } | null): Promise<string | null> {
+  if (!logo) return null;
+  try {
+    const { data } = await sharp(logo.bytes).flatten({ background: "#ffffff" }).resize(48, 48, { fit: "inside" }).raw().toBuffer({ resolveWithObject: true });
+    let melhor: [number, number, number] | null = null; let maior = 0;
+    for (let i = 0; i < data.length; i += 3) {
+      const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const sat = max === 0 ? 0 : (max - min) / max;
+      if (max < 40 || (max > 235 && sat < 0.1)) continue;
+      if (sat > maior) { maior = sat; melhor = [r, g, b]; }
+    }
+    if (!melhor || maior < 0.25) return null;
+    const k = 0.78;
+    return "#" + melhor.map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join("");
+  } catch { return null; }
 }
 
 async function lerMascote() {
