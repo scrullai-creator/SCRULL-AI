@@ -108,7 +108,7 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const [foto, logo] = await Promise.all([escolhida ?? gerarFoto(cena), lerLogo(cliente?.logo_url)]);
   const bytes = await montarArte({
     fundoJpeg: foto, titulo: post.titulo_arte ?? cliente?.nome_empresa ?? "", topicos: post.topicos ?? [],
-    layout: (post.layout as any) ?? "faixa", subtitulo: post.subtitulo ?? "",
+    layout: escolherLayout(post.layout, gancho, usadas), subtitulo: post.subtitulo ?? "",
     logo, nomeEmpresa: cliente?.nome_empresa ?? "", cor: corDaMarca(lerBriefing(cliente?.briefing).cores),
   });
   const url = await guardarArquivo(`${clienteId}/${postId}-${Date.now()}.jpg`, bytes, "image/jpeg");
@@ -116,6 +116,15 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const { error } = await db.from("posts").update({ imagem_url: url }).eq("id", postId);
   if (error) throw error;
   return url;
+}
+
+// Formato da arte: o que a IA escolheu para o post (ou um sorteado pelo id, para posts antigos
+// sem formato salvo). A cada troca de arte passa para o formato seguinte, para variar de verdade.
+const FORMATOS = ["faixa", "centro", "cartao", "frase"] as const;
+function escolherLayout(salvo: string | null | undefined, gancho: number, trocas: number) {
+  const i = FORMATOS.indexOf(salvo as any);
+  const base = i >= 0 ? i : gancho % FORMATOS.length;
+  return FORMATOS[(base + trocas) % FORMATOS.length];
 }
 
 async function lerLogo(url?: string | null) {
