@@ -4,6 +4,8 @@
 import { supabaseAdmin } from "./supabase";
 import { montarArte, corDaMarca, fonteDoRamo } from "./arte";
 import { montarArteScrull, modeloScrull, LUZ_SEM } from "./arte-scrull";
+import { criarArteCompleta, aplicarLogo } from "./arte-ia";
+import { segmentoDoRamo, estiloDoPost } from "./direcao-arte";
 import sharp from "sharp";
 import { lerBriefing } from "./briefing";
 import { listarFotos, prepararFoto } from "./fotos";
@@ -104,29 +106,61 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const cena = post.prompt_imagem || "A clean, modern photo of a small business, natural tones.";
   let bytes: Buffer;
 
-  if (/scrull/i.test(cliente?.nome_empresa ?? "")) {
-    // O próprio Scrull (@scrull.ai): artes institucionais de tecnologia, com modelo que varia
-    // de um dia para o outro (paleta, fonte e posição do texto). Não usa fotos enviadas.
+  const ehScrull = /scrull/i.test(cliente?.nome_empresa ?? "");
+  const briefing = lerBriefing(cliente?.briefing);
+  const titulo = post.titulo_arte ?? cliente?.nome_empresa ?? "";
+  // Fotos reais enviadas pelo cliente: as primeiras artes de cada post usam essas fotos;
+  // as trocas seguintes passam para as outras e, acabando elas, para uma foto criada pela IA.
+  const fotosDoCliente = ehScrull ? [] : await listarFotos(clienteId).catch(() => []);
+  const escolhida = fotosDoCliente.length > 0 && usadas < fotosDoCliente.length
+    ? await prepararFoto(fotosDoCliente[(gancho + usadas) % fotosDoCliente.length].url) : null;
+  const logo = ehScrull ? null : await lerLogo(cliente?.logo_url);
+  const corHex = briefing.cores ? corDaMarca(briefing.cores) : (await corDaLogo(logo)) ?? null;
+
+  // Arte completa pela IA (foto + texto + composição numa peça só, revisada pelo Claude).
+  // Por enquanto ligada só no próprio Scrull; ARTE_IA_TODOS=1 liga para todos os clientes.
+  let pronta: Buffer | null = null;
+  if (ehScrull || process.env.ARTE_IA_TODOS === "1") {
+    try {
+      const segmento = ehScrull ? "tecnologia" : segmentoDoRamo(cliente?.ramo ?? "");
+      const mascote = ehScrull ? await lerMascote() : null;
+      const { arte } = await criarArteCompleta({
+        empresa: cliente?.nome_empresa ?? "", ramo: ehScrull ? "app que cria e posta no Instagram de pequenos negócios" : (cliente?.ramo ?? ""),
+        estilo: estiloDoPost(segmento, post.agendado_para, usadas),
+        cores: ehScrull ? "violet #7c3aed, electric blue #2563eb, cyan #06b6d4, white; vary the mix per post"
+          : [briefing.cores, corHex].filter(Boolean).join(" / "),
+        titulo, subtitulo: post.subtitulo ?? "", topicos: post.layout === "faixa" ? post.topicos ?? [] : [],
+        cena: cena + (ehScrull ? " Small business context, no food, no pizza." : ""),
+        referencias: [
+          ...(escolhida ? [{ bytes: escolhida, tipo: "produto" as const }] : []),
+          ...(mascote ? [{ bytes: mascote, tipo: "mascote" as const }] : []),
+        ],
+        reservarCantoLogo: !!logo,
+      }, 45_000);
+      pronta = await aplicarLogo(arte, logo);
+    } catch (e: any) {
+      console.error("Arte IA falhou; usando o modelo de arte:", e?.message);
+    }
+  }
+
+  if (pronta) {
+    bytes = pronta;
+  } else if (ehScrull) {
+    // Plano B do Scrull: modelos de tecnologia montados pelo app
     const modelo = modeloScrull(post.agendado_para, usadas);
     const [foto, mascote] = await Promise.all([gerarFoto(cena + modelo.luz + LUZ_SEM), lerMascote()]);
     bytes = await montarArteScrull(modelo, {
-      fotoJpeg: foto, titulo: post.titulo_arte ?? "Scrull AI", subtitulo: post.subtitulo ?? "", topicos: post.topicos ?? [], mascote,
+      fotoJpeg: foto, titulo: titulo || "Scrull AI", subtitulo: post.subtitulo ?? "", topicos: post.topicos ?? [], mascote,
     });
   } else {
     // Clientes: cada um com a própria identidade (cores do briefing ou da logo, fonte pelo ramo,
     // fotos reais que ele enviou). Nada do Scrull e nada de outro cliente entra aqui.
-    // Se o cliente enviou fotos, as primeiras artes de cada post usam essas fotos reais (sem custo de IA);
-    // as trocas seguintes passam para as outras fotos e, acabando elas, para uma foto gerada.
-    const fotosDoCliente = await listarFotos(clienteId).catch(() => []);
-    const escolhida = fotosDoCliente.length > 0 && usadas < fotosDoCliente.length
-      ? await prepararFoto(fotosDoCliente[(gancho + usadas) % fotosDoCliente.length].url) : null;
-    const [foto, logo] = await Promise.all([escolhida ?? gerarFoto(cena), lerLogo(cliente?.logo_url)]);
-    const coresDoBriefing = lerBriefing(cliente?.briefing).cores;
+    const foto = escolhida ?? await gerarFoto(cena);
     bytes = await montarArte({
-      fundoJpeg: foto, titulo: post.titulo_arte ?? cliente?.nome_empresa ?? "", topicos: post.topicos ?? [],
+      fundoJpeg: foto, titulo, topicos: post.topicos ?? [],
       layout: escolherLayout(post.layout, gancho, usadas), subtitulo: post.subtitulo ?? "",
       logo, nomeEmpresa: cliente?.nome_empresa ?? "",
-      cor: coresDoBriefing ? corDaMarca(coresDoBriefing) : (await corDaLogo(logo)) ?? corDaMarca(""),
+      cor: corHex ?? corDaMarca(""),
       fonteTitulo: fonteDoRamo(cliente?.ramo ?? "", clienteId),
     });
   }
