@@ -45,6 +45,9 @@ function montarPrompt(p: PedidoArte, correcoes?: string) {
     `BRAND COLORS: ${p.cores || "choose colors that fit the segment"}.\n` +
     (refs ? `REFERENCES: ${refs}\n` : "") +
     `TEXT — write EXACTLY these words in Brazilian Portuguese, with correct accents and spelling, nothing else:\n${textos}\n` +
+    `SAFE ZONE (very important): Instagram's profile grid crops the left and right sides of the post. Keep ALL text, the headline, the list and the main subject ` +
+    `fully inside the central 70% of the width (leave at least 15% empty margin on the left and on the right, and 8% at the top and bottom); ` +
+    `no word may touch or get close to the left or right edge. Only background, scenery and decoration may extend to the edges.\n` +
     `RULES: the headline must be large and easy to read on a phone; the layout must feel full and intentional (no large empty or dull areas); ` +
     `photography sharp, well lit and clearly showing the subject; no other words, no fake logos, no brand names, no watermarks, no lorem ipsum, ` +
     `no misspelled or invented letters. All icons, checkmarks, shapes and accents use the brand colors (never default blue).` +
@@ -88,7 +91,8 @@ export type Revisao = { aprovada: boolean; nota: number; problemas: string };
 
 // O Claude olha a arte pronta como um diretor de arte exigente
 export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao> {
-  const jpg = await sharp(arte).resize(768, 768).jpeg({ quality: 85 }).toBuffer();
+  // O avaliador vê o recorte central (como a grade do perfil do Instagram mostra o post), para pegar texto cortado nas laterais
+  const jpg = await sharp(arte).extract({ left: 128, top: 0, width: 768, height: 1024 }).resize(576, 768).jpeg({ quality: 85 }).toBuffer();
   const esperado = [p.titulo, p.subtitulo, ...(p.topicos ?? [])].filter(Boolean).map((t) => `"${t}"`).join(", ");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -100,9 +104,10 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
         content: [
           { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpg.toString("base64") } },
           { type: "text", text:
-            `Você é diretor de arte de uma agência. Avalie este post de Instagram de "${p.empresa}" (${p.ramo}).\n` +
+            `Você é diretor de arte de uma agência. Avalie este post de Instagram de "${p.empresa}" (${p.ramo}). ` +
+            `A imagem enviada é o recorte central do post, do jeito que a grade do perfil do Instagram mostra (as laterais são cortadas).\n` +
             `Textos que DEVEM aparecer, escritos exatamente assim: ${esperado}.\n` +
-            `Reprove se: algum texto estiver errado, com letra trocada, acento errado ou palavra inventada; houver texto extra sem sentido; ` +
+            `Reprove se: alguma palavra ou letra do texto estiver cortada ou encostada na borda esquerda ou direita desta imagem; algum texto estiver errado, com letra trocada, acento errado ou palavra inventada; houver texto extra sem sentido; ` +
             `o título estiver pequeno ou difícil de ler no celular; a foto estiver borrada, estranha ou sem mostrar um assunto claro; ` +
             `houver grande espaço vazio ou sem graça; o produto ou cena for genérico e sem apelo (objeto vazio, caixa lisa); ` +
             `houver um mascote só parado ou apontando, sem fazer a ação do post; ícones fora das cores da marca; parecer amador.\n` +
