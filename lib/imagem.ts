@@ -136,6 +136,7 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
           ...(mascote ? [{ bytes: mascote, tipo: "mascote" as const }] : []),
         ],
         reservarCantoLogo: !!logo,
+        assinatura: ehScrull ? "@scrull.ai" : undefined,
       }, 45_000);
       pronta = await aplicarLogo(arte, logo);
     } catch (e: any) {
