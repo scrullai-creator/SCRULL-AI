@@ -145,7 +145,7 @@ async function legendaDoReels(c: { nome_empresa: string; ramo: string | null; to
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: MODELO, max_tokens: 1200, temperature: 0.9,
+      model: MODELO, max_tokens: 4000, output_config: { effort: "low" },
       system:
         "Você é a social media de uma agência brasileira que cuida do Instagram de pequenos negócios. " +
         "Escreve legendas de reels em português do Brasil, curtas, com calor e personalidade, sem clichês de IA. " +
