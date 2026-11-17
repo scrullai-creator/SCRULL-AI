@@ -1,3 +1,4 @@
+import { ManterPosicao } from "./manter-posicao";
 import { redirect } from "next/navigation";
 import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgora, assinar, cancelar, reescreverLegendaPost } from "./gerar";
 import { supabaseDoUsuario } from "@/lib/supabase";
@@ -101,6 +102,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
 
   return (
     <>
+      <ManterPosicao />
       <header className="topo">
         <div className="logo"><img src="/mascote-pequeno.png" alt="" width={34} height={34} className="logo-img" />SCRULL<i>AI</i></div>
         <span style={{ display: "flex", gap: 8 }}>
