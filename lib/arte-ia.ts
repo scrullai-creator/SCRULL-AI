@@ -20,6 +20,7 @@ export type PedidoArte = {
   // Referências enviadas junto: fotos reais do cliente (o produto não pode mudar) e/ou o mascote
   referencias?: { bytes: Buffer; tipo: "produto" | "mascote" }[];
   reservarCantoLogo: boolean;  // deixa o canto inferior direito livre para a logo
+  assinatura?: string;         // ex.: "@scrull.ai", escrito pequeno num canto
 };
 
 function montarPrompt(p: PedidoArte, correcoes?: string) {
@@ -31,18 +32,23 @@ function montarPrompt(p: PedidoArte, correcoes?: string) {
   const refs = (p.referencias ?? []).map((r) =>
     r.tipo === "produto"
       ? "Use the product/place from the reference photo as the hero subject. Keep it exactly as it is (do not change the product, labels or shapes), just make it look its best."
-      : "Include the friendly purple robot mascot from the reference image, keeping its exact design, integrated naturally in the scene (not as a pasted sticker or app icon), small to medium size."
+      : "Include the friendly purple robot mascot from the reference image, keeping its exact design, integrated naturally in the scene (not as a pasted sticker or app icon). " +
+        "The mascot must be ACTIVELY DOING the action the post is about (for example: holding a smartphone and photographing the product, " +
+        "adjusting a light, arranging the product, scheduling posts on a tablet, celebrating likes popping up), never just standing or pointing."
   ).join(" ");
   return (
     `Design a finished, professional square Instagram feed post (1:1), the kind a top social media agency delivers, for "${p.empresa}" (${p.ramo}).\n` +
     `ART DIRECTION: ${p.estilo}\n` +
     `PHOTO / SCENE: ${p.cena}\n` +
+    `The scene must tell a small story and look desirable: show a specific, attractive, real-looking product or place of a small business ` +
+    `with context and props (never a generic stock object like an empty bottle, a plain box or a blank mug).\n` +
     `BRAND COLORS: ${p.cores || "choose colors that fit the segment"}.\n` +
     (refs ? `REFERENCES: ${refs}\n` : "") +
     `TEXT — write EXACTLY these words in Brazilian Portuguese, with correct accents and spelling, nothing else:\n${textos}\n` +
     `RULES: the headline must be large and easy to read on a phone; the layout must feel full and intentional (no large empty or dull areas); ` +
     `photography sharp, well lit and clearly showing the subject; no other words, no fake logos, no brand names, no watermarks, no lorem ipsum, ` +
-    `no misspelled or invented letters.` +
+    `no misspelled or invented letters. All icons, checkmarks, shapes and accents use the brand colors (never default blue).` +
+    (p.assinatura ? ` Add the handle "${p.assinatura}" small and discreet in a corner.` : "") +
     (p.reservarCantoLogo ? ` Leave the bottom-right corner (about 16% of the width) clean and simple for the brand logo, which will be added later.` : "") +
     (correcoes ? `\nFIX THESE PROBLEMS FROM THE PREVIOUS VERSION: ${correcoes}` : "")
   );
@@ -98,7 +104,8 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
             `Textos que DEVEM aparecer, escritos exatamente assim: ${esperado}.\n` +
             `Reprove se: algum texto estiver errado, com letra trocada, acento errado ou palavra inventada; houver texto extra sem sentido; ` +
             `o título estiver pequeno ou difícil de ler no celular; a foto estiver borrada, estranha ou sem mostrar um assunto claro; ` +
-            `houver grande espaço vazio ou sem graça; parecer amador.\n` +
+            `houver grande espaço vazio ou sem graça; o produto ou cena for genérico e sem apelo (objeto vazio, caixa lisa); ` +
+            `houver um mascote só parado ou apontando, sem fazer a ação do post; ícones fora das cores da marca; parecer amador.\n` +
             `Responda SOMENTE JSON: {"nota": 0-10, "texto_ok": true|false, "problemas": "lista curta em inglês do que corrigir, vazia se nada"}` },
         ],
       }],

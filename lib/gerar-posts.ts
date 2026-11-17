@@ -68,8 +68,9 @@ const SCRULL_INSTITUCIONAL =
   `postagem automática), sai mais barato que assinar várias IAs ou contratar alguém, bastidores do app, dicas de Instagram para negócios. ` +
   `A pizzaria é só a origem da história da fundadora: no máximo 1 post a cada várias semanas sobre isso, e NUNCA foto de pizza, comida ou restaurante. ` +
   `Tom leve e confiante, nunca radical (evite "odeio", "pavor", "desespero"). ` +
-  `Fotos de "prompt_imagem": ambientes de pequenos negócios variados (loja, salão, oficina, ateliê, mercadinho) ou celular com o Instagram na mão, ` +
-  `sempre com iluminação roxa e violeta neon, clima noturno e moderno; sem robôs, sem telas com texto legível. `;
+  `"prompt_imagem": uma cena concreta e atraente de um pequeno negócio real (doceria, loja de roupas, salão, oficina, ateliê, mercadinho...), ` +
+  `com um produto específico e bonito, e o mascote robô roxo do Scrull FAZENDO a ação do post (fotografando o produto com o celular, ` +
+  `agendando posts num tablet, arrumando a vitrine, comemorando curtidas); nunca objetos genéricos nem o robô parado; sem telas com texto legível. `;
 
 export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: string } {
   const hoje = new Date().toLocaleDateString("pt-BR", {
