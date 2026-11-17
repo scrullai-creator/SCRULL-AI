@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
-import { criarPosts } from "@/lib/gerar-posts";
+import { criarPosts, reescreverLegenda } from "@/lib/gerar-posts";
 import { lerPerfil, resumoDoPerfil } from "@/lib/instagram-leitura";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
 import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
@@ -204,4 +204,37 @@ export async function cancelar() {
   }
   revalidatePath("/painel");
   redirect(`/painel?ig=${resultado}`);
+}
+
+// Reescreve a legenda de um post com a IA (texto mais humano). Até 3 vezes por post por dia.
+const reescritas = new Map<string, { dia: string; n: number }>();
+export async function reescreverLegendaPost(f: FormData) {
+  const { s, user } = await usuarioLogado();
+  const id = String(f.get("id") ?? "");
+  let resultado = "leg-erro";
+  try {
+    const dia = new Date().toISOString().slice(0, 10);
+    const r = reescritas.get(id);
+    if (r && r.dia === dia && r.n >= 3) {
+      resultado = "leg-limite";
+    } else {
+      const [{ data: post }, { data: c }] = await Promise.all([
+        s.from("posts").select("tema, titulo_arte, legenda, status").eq("id", id).eq("cliente_id", user.id).single(),
+        s.from("clientes").select("nome_empresa, ramo, tom_de_voz, briefing").eq("id", user.id).single(),
+      ]);
+      if (post && c && post.status !== "publicado") {
+        const novo = await reescreverLegenda({
+          empresa: c.nome_empresa, ramo: c.ramo ?? "", tom: c.tom_de_voz ?? "", briefing: lerBriefing(c.briefing),
+          tema: post.tema ?? "", titulo: post.titulo_arte ?? "", legendaAtual: post.legenda ?? "",
+        });
+        await s.from("posts").update({ legenda: novo.legenda, hashtags: novo.hashtags }).eq("id", id).eq("cliente_id", user.id);
+        reescritas.set(id, { dia, n: (r && r.dia === dia ? r.n : 0) + 1 });
+        resultado = "leg-ok";
+      }
+    }
+  } catch (e) {
+    console.error("Erro ao reescrever legenda:", e);
+  }
+  revalidatePath("/painel");
+  redirect(`/painel?ig=${resultado}#post-${id}`);
 }

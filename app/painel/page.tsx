@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgora, assinar, cancelar } from "./gerar";
+import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgora, assinar, cancelar, reescreverLegendaPost } from "./gerar";
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
 import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
@@ -21,6 +21,9 @@ const AVISOS: Record<string, [string, boolean]> = {
   "img-ok": ["Arte criada! Se não gostar, é só gerar outra.", true],
   "img-erro": ["Não foi possível criar a arte agora. Tente de novo em instantes.", false],
   "pub-ok": ["Post publicado no Instagram!", true],
+  "leg-ok": ["Legenda reescrita! Se ainda não gostar, pode pedir outra ou editar à mão.", true],
+  "leg-erro": ["Não foi possível reescrever a legenda agora. Tente de novo em instantes.", false],
+  "leg-limite": ["Você já reescreveu esta legenda 3 vezes hoje. Edite à mão ou tente amanhã.", false],
   "pub-erro": ["Não foi possível publicar agora. Veja o motivo no post e tente de novo.", false],
   "pub-assine": ["Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.", false],
   "assin-ok": ["Assinatura confirmada! A Scrull já pode publicar para você.", true],
@@ -294,6 +297,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                         {p.status !== "recusado" && (
                           <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ghost">Recusar</Botao></form>
                         )}
+                        <form action={reescreverLegendaPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ghost">Reescrever legenda</Botao></form>
                         <details>
                           <summary>Editar legenda</summary>
                           <form action={salvarLegenda}>
