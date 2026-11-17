@@ -94,7 +94,7 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: MODELO_REVISAO, max_tokens: 400, temperature: 0,
+      model: MODELO_REVISAO, max_tokens: 3000, output_config: { effort: "low" },
       messages: [{
         role: "user",
         content: [
@@ -112,7 +112,8 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
     }),
   });
   if (!res.ok) {
-    console.error("Revisão da arte: erro", res.status);
+    const e = await res.json().catch(() => null);
+    console.error("Revisão da arte: erro", res.status, e?.error?.message ?? "");
     return { aprovada: true, nota: -1, problemas: "" }; // sem revisão, não trava o cliente
   }
   const j = await res.json();

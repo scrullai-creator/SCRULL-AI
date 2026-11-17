@@ -178,8 +178,9 @@ export async function criarPosts(a: DadosParaGerar): Promise<PostGerado[]> {
       },
       body: JSON.stringify({
         model: MODELO,
-        max_tokens: 8000,
-        temperature: 1,
+        // Modelos novos (Sonnet/Haiku 5.5) recusam temperature; "effort" baixo deixa a resposta rápida
+        max_tokens: 16000,
+        output_config: { effort: "low" },
         system: sistema,
         messages: [{ role: "user", content }],
       }),
@@ -233,7 +234,7 @@ export async function reescreverLegenda(a: {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: MODELO, max_tokens: 1200, temperature: 1,
+      model: MODELO, max_tokens: 4000, output_config: { effort: "low" },
       system:
         `Você é a social media de uma agência brasileira que cuida do Instagram de pequenos negócios. ` +
         `Nunca inventa preços, endereços, telefones, prêmios ou depoimentos. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA,
@@ -247,7 +248,11 @@ export async function reescreverLegenda(a: {
       }],
     }),
   });
-  if (!res.ok) throw new Error(`A IA respondeu com erro ${res.status}`);
+  if (!res.ok) {
+    const e = await res.json().catch(() => null);
+    console.error("Reescrever legenda: erro", res.status, e?.error?.message ?? "");
+    throw new Error(`A IA respondeu com erro ${res.status}`);
+  }
   const j = await res.json();
   const texto: string = (j.content ?? []).map((b: any) => b.text ?? "").join("");
   const r = JSON.parse(texto.slice(texto.indexOf("{"), texto.lastIndexOf("}") + 1));
