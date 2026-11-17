@@ -14,8 +14,10 @@ export const GUIA_LEGENDA =
   `- Comece por uma cena concreta, um detalhe real ou uma frase que alguém diria de verdade. Nada de abrir com pergunta retórica genérica ` +
   `("Quantas vezes você já...?", "Você sabia que...?", "Já parou pra pensar...?").\n` +
   `- Uma ideia só por legenda. Mostre com um exemplo específico do ramo em vez de explicar ou dar lição.\n` +
-  `- Termine de um jeito natural, como quem encerra uma conversa: uma pergunta simples, um convite direto ou só a frase final. ` +
-  `Varie: nem todo post precisa de chamada para ação.\n` +
+  `- COMO TERMINAR: a maioria das legendas NÃO termina com pergunta. Em um lote de posts, no máximo 1 de cada 4 pode terminar com pergunta ` +
+  `(e nunca dois seguidos). Prefira fechar com uma frase afirmativa, um detalhe do produto, um horário, um convite direto ("o forno já tá aceso") ` +
+  `ou simplesmente a última ideia, sem chamada nenhuma. Cada fim de legenda deve ser diferente dos outros. ` +
+  `Mesmo que as legendas antigas do cliente terminem sempre com pergunta, não copie esse hábito.\n` +
   `- PROIBIDO (soa robô): "Se você se reconheceu", "guarda essa frase", "segue o dia", "a gente pode cuidar por você", ` +
   `"no mundo de hoje", "potencialize", "transforme", "descubra", "não perca", "venha conferir", "é isso mesmo", ` +
   `"e aí, bora?", "conta pra gente nos comentários" em todo post, frases de efeito vazias, três adjetivos seguidos, ` +
