@@ -212,6 +212,7 @@ export async function reescreverLegendaPost(f: FormData) {
   const { s, user } = await usuarioLogado();
   const id = String(f.get("id") ?? "");
   let resultado = "leg-erro";
+  console.log("[legenda] início", id);
   try {
     const dia = new Date().toISOString().slice(0, 10);
     const r = reescritas.get(id);
@@ -222,12 +223,16 @@ export async function reescreverLegendaPost(f: FormData) {
         s.from("posts").select("tema, titulo_arte, legenda, status").eq("id", id).eq("cliente_id", user.id).single(),
         s.from("clientes").select("nome_empresa, ramo, tom_de_voz, briefing").eq("id", user.id).single(),
       ]);
+      console.log("[legenda] post lido:", !!post, "cliente lido:", !!c, "status:", post?.status);
       if (post && c && post.status !== "publicado") {
         const novo = await reescreverLegenda({
           empresa: c.nome_empresa, ramo: c.ramo ?? "", tom: c.tom_de_voz ?? "", briefing: lerBriefing(c.briefing),
           tema: post.tema ?? "", titulo: post.titulo_arte ?? "", legendaAtual: post.legenda ?? "",
         });
-        await s.from("posts").update({ legenda: novo.legenda, hashtags: novo.hashtags }).eq("id", id).eq("cliente_id", user.id);
+        console.log("[legenda] IA respondeu", novo.legenda.length, "caracteres");
+        const { error: errUp, data: upd } = await s.from("posts").update({ legenda: novo.legenda, hashtags: novo.hashtags }).eq("id", id).eq("cliente_id", user.id).select("id");
+        console.log("[legenda] gravou:", upd?.length ?? 0, "linha(s)", errUp ? `erro: ${errUp.message}` : "");
+        if (errUp || !upd?.length) throw new Error("Não consegui gravar a nova legenda");
         reescritas.set(id, { dia, n: (r && r.dia === dia ? r.n : 0) + 1 });
         resultado = "leg-ok";
       }
