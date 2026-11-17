@@ -3,7 +3,28 @@
 // e a descrição da imagem (que outro serviço transforma em arte).
 import { type Briefing, briefingParaPrompt } from "./briefing";
 
-const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-haiku-5-5";
+// Sonnet escreve bem melhor que o Haiku (legendas mais humanas); custa ~R$ 0,45 por semana de posts
+const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5";
+
+// Guia de escrita das legendas: o que separa um post de gente de um post de robô
+export const GUIA_LEGENDA =
+  `COMO ESCREVER A LEGENDA (o mais importante):\n` +
+  `- Escreva como o dono do negócio falaria com um cliente conhecido no balcão ou no WhatsApp: frases curtas, jeito brasileiro, ` +
+  `palavras do dia a dia ("a gente", "pra", "olha só", "sabe aquele..."), sem tom de professor e sem tom de propaganda.\n` +
+  `- Comece por uma cena concreta, um detalhe real ou uma frase que alguém diria de verdade. Nada de abrir com pergunta retórica genérica ` +
+  `("Quantas vezes você já...?", "Você sabia que...?", "Já parou pra pensar...?").\n` +
+  `- Uma ideia só por legenda. Mostre com um exemplo específico do ramo em vez de explicar ou dar lição.\n` +
+  `- Termine de um jeito natural, como quem encerra uma conversa: uma pergunta simples, um convite direto ou só a frase final. ` +
+  `Varie: nem todo post precisa de chamada para ação.\n` +
+  `- PROIBIDO (soa robô): "Se você se reconheceu", "guarda essa frase", "segue o dia", "a gente pode cuidar por você", ` +
+  `"no mundo de hoje", "potencialize", "transforme", "descubra", "não perca", "venha conferir", "é isso mesmo", ` +
+  `"e aí, bora?", "conta pra gente nos comentários" em todo post, frases de efeito vazias, três adjetivos seguidos, ` +
+  `explicar a piada, repetir a mesma estrutura entre os posts.\n` +
+  `- Emoji: no máximo 1 ou 2, só onde uma pessoa colocaria; nunca um no fim de cada parágrafo.\n` +
+  `- Exemplo ruim (robô): "Quantas vezes você já disse 'hoje eu posto' e a noite chegou sem nenhum post? 😅 Acontece com quem tem um negócio ` +
+  `para tocar. Se você se reconheceu, guarda essa frase e segue o dia. Essa parte a gente pode cuidar por você. 💜"\n` +
+  `- Exemplo bom (gente): "Terça, 21h. Caixa fechado, criança no banho, e o post do dia ainda no 'depois eu faço'. ` +
+  `Todo dono de loja já viveu essa terça. Foi pensando nela que o Scrull nasceu: você conta como é o seu negócio uma vez e ele cuida do resto."\n`;
 
 export const LAYOUTS = ["faixa", "centro", "cartao", "frase"] as const;
 export type Layout = (typeof LAYOUTS)[number];
@@ -86,7 +107,7 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `com calor, ritmo e personalidade, sem soar robótico, sem fórmula repetida, sem clichês de IA ("no mundo de hoje", ` +
     `"potencialize", "descubra", "transforme"). ` +
     `Nunca inventa preços, endereços, telefones, números de clientes, prêmios ou depoimentos. ` +
-    `Só fala de oferta se o briefing tiver uma. Responde SOMENTE com JSON válido.`;
+    `Só fala de oferta se o briefing tiver uma. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA;
 
   const usuario =
     `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\nHOJE: ${hoje}\n\n` +
