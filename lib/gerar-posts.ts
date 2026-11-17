@@ -223,3 +223,39 @@ export async function criarPosts(a: DadosParaGerar): Promise<PostGerado[]> {
     prompt_imagem: limpar(p.prompt_imagem, 1500),
   })).filter((p: PostGerado) => p.legenda && p.titulo);
 }
+
+// Reescreve a legenda de um post já criado, seguindo o guia de escrita humana
+export async function reescreverLegenda(a: {
+  empresa: string; ramo: string; tom: string; briefing: Briefing;
+  tema: string; titulo: string; legendaAtual: string;
+}): Promise<{ legenda: string; hashtags: string[] }> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: MODELO, max_tokens: 1200, temperature: 1,
+      system:
+        `Você é a social media de uma agência brasileira que cuida do Instagram de pequenos negócios. ` +
+        `Nunca inventa preços, endereços, telefones, prêmios ou depoimentos. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA,
+      messages: [{
+        role: "user",
+        content:
+          `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\n\nBRIEFING:\n${briefingParaPrompt(a.briefing)}\n\n` +
+          `POST: assunto "${a.tema}", título da arte "${a.titulo}".\n` +
+          `LEGENDA ATUAL (soa robótica; reescreva do zero, mantendo só o assunto):\n${a.legendaAtual}\n\n` +
+          `Responda: {"legenda": "até 600 caracteres, sem hashtags dentro", "hashtags": ["3 a 6 hashtags"]}`,
+      }],
+    }),
+  });
+  if (!res.ok) throw new Error(`A IA respondeu com erro ${res.status}`);
+  const j = await res.json();
+  const texto: string = (j.content ?? []).map((b: any) => b.text ?? "").join("");
+  const r = JSON.parse(texto.slice(texto.indexOf("{"), texto.lastIndexOf("}") + 1));
+  const legenda = String(r.legenda ?? "").trim().slice(0, 2000);
+  if (!legenda) throw new Error("A IA não devolveu a legenda");
+  return {
+    legenda,
+    hashtags: (Array.isArray(r.hashtags) ? r.hashtags : []).map((h: unknown) => String(h).trim().replace(/\s+/g, ""))
+      .map((h: string) => (h.startsWith("#") ? h : `#${h}`)).filter((h: string) => h.length > 1).slice(0, 6),
+  };
+}
