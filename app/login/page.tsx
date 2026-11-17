@@ -141,7 +141,7 @@ export default function Login() {
               <form className="sl-fields" onSubmit={cadastrar}>
                 <div className="sl-field">
                   <label htmlFor="c-nome">Nome do negócio</label>
-                  <input id="c-nome" type="text" placeholder="Ex: Lá Romana Pizzaria" value={nome} onChange={e => setNome(e.target.value)} required autoComplete="organization" />
+                  <input id="c-nome" type="text" placeholder="Ex: Nome da sua empresa" value={nome} onChange={e => setNome(e.target.value)} required autoComplete="organization" />
                 </div>
                 <div className="sl-field">
                   <label htmlFor="c-email">E-mail</label>

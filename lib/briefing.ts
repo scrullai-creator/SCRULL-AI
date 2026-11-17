@@ -13,7 +13,7 @@ export type Briefing = {
 
 export const CAMPOS_BRIEFING: { chave: keyof Briefing; rotulo: string; dica: string; linhas: number }[] = [
   { chave: "sobre", rotulo: "Sobre a empresa", dica: "O que vocês fazem e como funciona, em poucas linhas.", linhas: 3 },
-  { chave: "publico", rotulo: "Para quem é", dica: "Ex.: donos de pizzaria, lojas de roupa, salões de beleza.", linhas: 2 },
+  { chave: "publico", rotulo: "Para quem é", dica: "Ex.: motociclistas da região, mães que trabalham fora, donos de pequenos negócios.", linhas: 2 },
   { chave: "diferencial", rotulo: "Diferencial", dica: "Por que o cliente escolhe vocês e não o concorrente.", linhas: 2 },
   { chave: "historia", rotulo: "História", dica: "Como começou, quem está por trás. A IA usa para posts de bastidores.", linhas: 3 },
   { chave: "oferta", rotulo: "Oferta atual", dica: "Promoção, teste grátis ou chamada do momento. Pode deixar em branco.", linhas: 2 },
