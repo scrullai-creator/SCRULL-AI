@@ -21,7 +21,7 @@ const AVISOS: Record<string, [string, boolean]> = {
   "ger-erro": ["Não foi possível criar os posts agora. Tente de novo em instantes.", false],
   "img-ok": ["Arte criada! Se não gostar, é só gerar outra.", true],
   "img-erro": ["Não foi possível criar a arte agora. Tente de novo em instantes.", false],
-  "pub-ok": ["Post publicado no Instagram!", true],
+  "pub-ok": ["Post publicado!", true],
   "leg-ok": ["Legenda reescrita! Se ainda não gostar, pode pedir outra ou editar à mão.", true],
   "leg-erro": ["Não foi possível reescrever a legenda agora. Tente de novo em instantes.", false],
   "leg-limite": ["Você já reescreveu esta legenda 3 vezes hoje. Edite à mão ou tente amanhã.", false],
@@ -86,6 +86,11 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
   const ehDono = (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((e) => e.trim()).includes((user.email ?? "").toLowerCase());
   const fotos = await listarFotos(user.id).catch(() => []);
   const conta = contas?.[0];
+  // Página do Facebook (consulta separada: se a migração 9 ainda não rodou, só não aparece)
+  const { data: fb } = conta
+    ? await supabase.from("contas_instagram").select("fb_page_id, fb_page_nome").eq("id", conta.id).maybeSingle()
+    : { data: null };
+  const paginaFb = fb?.fb_page_id ? (fb.fb_page_nome || "sua Página") : null;
   const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
   const artes = posts?.length ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
   const aviso = ig ? AVISOS[ig] : undefined;
@@ -128,6 +133,13 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
             <>
               <span className="badge ok">Conectado</span>
               <p style={{ margin: "12px 0 0" }}>Perfil @{conta.ig_username} pronto para receber os posts.</p>
+              {paginaFb ? (
+                <p className="sub" style={{ margin: "6px 0 0" }}>Facebook: os posts saem também na Página {paginaFb}.</p>
+              ) : (
+                <p className="sub" style={{ margin: "6px 0 0" }}>
+                  Quer que os posts saiam também no Facebook? <a href="/api/instagram/connect">Conecte de novo</a> e marque a Página do Facebook da sua empresa.
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -276,6 +288,8 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
                     <p className="legenda">{p.legenda}</p>
                     {!!p.hashtags?.length && <p className="tags">{p.hashtags.join(" ")}</p>}
                     {p.erro_msg && <p className="erro">{p.erro_msg}</p>}
+                    {p.fb_post_id && <p className="sub">Saiu também no Facebook.</p>}
+                    {p.fb_erro_msg && <p className="erro">{p.fb_erro_msg}</p>}
                     {editavel && (
                       <div className="acoes">
                         {(assinante ? (artes.porPost[p.id] ?? 0) < ARTES_POR_POST : artes.noMes < ARTES_DEMO) ? (
@@ -321,6 +335,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
         <div className="card">
           <Chave campo="postar_sem_aprovacao" valor={!!cfg?.postar_sem_aprovacao} titulo="Postar sem pedir aprovação" descricao="Desligado: nada vai ao ar sem você aprovar." />
           <Chave campo="melhor_horario" valor={cfg?.melhor_horario ?? true} titulo="Escolher o melhor horário" descricao="Usa os horários em que seus seguidores estão online." />
+          {paginaFb && (
+            <Chave campo="publicar_facebook" valor={cfg?.publicar_facebook ?? true} titulo="Publicar também no Facebook" descricao={`O mesmo post sai na Página ${paginaFb}, no mesmo horário.`} />
+          )}
           <Chave campo="pausado" valor={!!cfg?.pausado} titulo="Pausar publicações" descricao="Nenhum post sai enquanto estiver ligado." />
         </div>
         {assinante && cliente?.mp_assinatura_id && (

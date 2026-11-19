@@ -2,6 +2,7 @@
 // Dois passos: cria o "container" com a imagem e a legenda, depois publica.
 import { supabaseAdmin } from "./supabase";
 import { decifrar } from "./crypto";
+import { publicarNaPagina } from "./facebook";
 
 const GRAPH = "https://graph.facebook.com/v27.0";
 
@@ -62,9 +63,38 @@ export async function publicarPost(postId: string, clienteId: string) {
       body: new URLSearchParams({ creation_id: container.id, access_token: token }),
     });
     await db.from("posts").update({ status: "publicado", ig_media_id: String(pub.id), erro_msg: null, conta_id: contaId }).eq("id", postId);
+    await publicarTambemNoFacebook(postId, clienteId, contaId, post.imagem_url, post.legenda, post.hashtags ?? []);
     return String(pub.id);
   } catch (e: any) {
     await db.from("posts").update({ erro_msg: String(e?.message ?? e).slice(0, 300) }).eq("id", postId);
     throw e;
+  }
+}
+
+// Depois que o post sai no Instagram, sai também na Página do Facebook (se houver
+// Página conectada e o cliente não tiver desligado). Nunca derruba o Instagram:
+// qualquer falha fica só em fb_erro_msg.
+async function publicarTambemNoFacebook(
+  postId: string, clienteId: string, contaId: string, imagemUrl: string, legenda: string, hashtags: string[]
+) {
+  const db = supabaseAdmin();
+  try {
+    const [{ data: cfg }, { data: conta }, { data: tk }, { data: post }] = await Promise.all([
+      db.from("configuracoes").select("publicar_facebook").eq("cliente_id", clienteId).single(),
+      db.from("contas_instagram").select("fb_page_id").eq("id", contaId).single(),
+      db.from("tokens_instagram").select("fb_page_token_cifrado").eq("conta_id", contaId).single(),
+      db.from("posts").select("fb_post_id").eq("id", postId).single(),
+    ]);
+    // Sem a migração 9, sem Página ou desligado pelo cliente: não faz nada
+    if (!cfg || cfg.publicar_facebook === false) return;
+    if (!conta?.fb_page_id || !tk?.fb_page_token_cifrado) return;
+    if (post?.fb_post_id) return; // já saiu no Facebook
+
+    // No Facebook, poucas hashtags funcionam melhor
+    const texto = [legenda, hashtags.slice(0, 5).join(" ")].filter(Boolean).join("\n\n").slice(0, 5000);
+    const fbId = await publicarNaPagina(conta.fb_page_id, decifrar(tk.fb_page_token_cifrado), imagemUrl, texto);
+    await db.from("posts").update({ fb_post_id: fbId, fb_erro_msg: null }).eq("id", postId);
+  } catch (e: any) {
+    await db.from("posts").update({ fb_erro_msg: `Facebook: ${String(e?.message ?? e)}`.slice(0, 300) }).eq("id", postId);
   }
 }
