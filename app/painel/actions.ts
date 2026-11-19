@@ -35,7 +35,7 @@ export async function salvarLegenda(f: FormData) {
   revalidatePath("/painel");
 }
 
-const CAMPOS = ["postar_sem_aprovacao", "melhor_horario", "pausado"];
+const CAMPOS = ["postar_sem_aprovacao", "melhor_horario", "pausado", "publicar_facebook"];
 export async function alternarConfig(f: FormData) {
   const campo = String(f.get("campo"));
   if (!CAMPOS.includes(campo)) return;

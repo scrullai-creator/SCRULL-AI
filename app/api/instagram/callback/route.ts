@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
 import { trocarCodigo, perfil, SemContaInstagram } from "@/lib/instagram";
 import { cifrar } from "@/lib/crypto";
+import { paginaDoFacebook } from "@/lib/facebook";
 
 export async function GET(req: NextRequest) {
   const base = process.env.APP_URL!;
@@ -55,6 +56,19 @@ export async function GET(req: NextRequest) {
       atualizado_em: new Date().toISOString(),
     });
     if (erroToken) throw erroToken;
+
+    // Extra: Página do Facebook ligada ao Instagram. Se não houver ou der erro,
+    // o Instagram continua conectado normalmente.
+    const pagina = await paginaDoFacebook(acesso.token, p.userId);
+    if (pagina) {
+      const [r1, r2] = await Promise.all([
+        db.from("contas_instagram").update({ fb_page_id: pagina.id, fb_page_nome: pagina.nome }).eq("id", conta.id),
+        db.from("tokens_instagram").update({ fb_page_token_cifrado: cifrar(pagina.token) }).eq("conta_id", conta.id),
+      ]);
+      if (r1.error || r2.error) console.error("Página do Facebook não foi salva:", r1.error?.message ?? r2.error?.message);
+    } else {
+      await db.from("contas_instagram").update({ fb_page_id: null, fb_page_nome: null }).eq("id", conta.id);
+    }
 
     return volta("ok");
   } catch (e) {
