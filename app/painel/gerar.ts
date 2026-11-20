@@ -6,7 +6,8 @@ import { criarPosts, reescreverLegenda } from "@/lib/gerar-posts";
 import { lerPerfil, resumoDoPerfil } from "@/lib/instagram-leitura";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
 import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
-import { publicarPost } from "@/lib/publicar";
+import { publicarPost, PostOcupado } from "@/lib/publicar";
+import { registrar } from "@/lib/historico";
 import { criarAssinatura, cancelarAssinatura, pagamentoConfigurado } from "@/lib/mercadopago";
 
 const HORAS = ["19:00", "12:00", "11:30", "18:30", "19:00", "12:30", "19:00"];
@@ -94,15 +95,17 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
   });
   const passo = qtd >= 7 ? 1 : 2;
   const status = cfg?.postar_sem_aprovacao ? "aprovado" : "aguardando_aprovacao";
-  const { error } = await db.from("posts").insert(
+  const { data: criados, error } = await db.from("posts").insert(
     lista.map((p, i) => ({
       cliente_id: userId, conta_id: conta?.id ?? null, titulo_arte: p.titulo, topicos: p.topicos, tema: p.tema,
       layout: p.layout, subtitulo: p.subtitulo || null,
       legenda: p.legenda, hashtags: p.hashtags, prompt_imagem: p.prompt_imagem,
       agendado_para: horario(1 + i * passo, HORAS[i % HORAS.length]), status,
     }))
-  );
+  ).select("id");
   if (error) throw error;
+  await registrar((criados ?? []).map((p) => p.id), userId, "criado",
+    status === "aprovado" ? "criado pela Scrull e aprovado automaticamente (postar sem aprovação ligado)" : "criado pela Scrull", "automático");
   return "ger-ok";
 }
 
@@ -143,6 +146,7 @@ export async function gerarImagemPost(f: FormData) {
   let resultado = "img-erro";
   try {
     await gerarArteDoPost(id, user.id);
+    await registrar(id, user.id, "arte", "nova arte criada");
     resultado = "img-ok";
   } catch (e) {
     if (e instanceof LimiteDeArtes) {
@@ -152,7 +156,15 @@ export async function gerarImagemPost(f: FormData) {
     }
   }
   revalidatePath("/painel");
-  redirect(`/painel?ig=${resultado}#post-${id}`);
+  redirect(destino(f, resultado, id));
+}
+
+// Volta para a mesma aba/visão do painel, com o aviso e no mesmo post
+function destino(f: FormData, aviso: string, id: string) {
+  const vista = String(f.get("vista") ?? "");
+  const q = new URLSearchParams(vista.startsWith("?") ? vista.slice(1) : vista);
+  q.set("ig", aviso);
+  return `/painel?${q}#post-${id}`;
 }
 
 // Publicar agora no Instagram (só assinantes) -------------------------------
@@ -165,15 +177,18 @@ export async function publicarAgora(f: FormData) {
     const { data: c } = await db.from("clientes").select("assinatura").eq("id", user.id).single();
     if (c?.assinatura !== "ativa") {
       resultado = "pub-assine";
+    } else if (f.get("confirmado") !== "sim") {
+      resultado = "pub-confirmar";
     } else {
       await publicarPost(id, user.id);
       resultado = "pub-ok";
     }
   } catch (e) {
-    console.error("Erro ao publicar:", e);
+    if (e instanceof PostOcupado) resultado = "pub-ocupado";
+    else console.error("Erro ao publicar:", e);
   }
   revalidatePath("/painel");
-  redirect(`/painel?ig=${resultado}#post-${id}`);
+  redirect(destino(f, resultado, id));
 }
 
 // Assinatura ------------------------------------------------------------------
@@ -234,6 +249,7 @@ export async function reescreverLegendaPost(f: FormData) {
         console.log("[legenda] gravou:", upd?.length ?? 0, "linha(s)", errUp ? `erro: ${errUp.message}` : "");
         if (errUp || !upd?.length) throw new Error("Não consegui gravar a nova legenda");
         reescritas.set(id, { dia, n: (r && r.dia === dia ? r.n : 0) + 1 });
+        await registrar(id, user.id, "legenda", "reescrita pela IA");
         resultado = "leg-ok";
       }
     }
@@ -241,5 +257,5 @@ export async function reescreverLegendaPost(f: FormData) {
     console.error("Erro ao reescrever legenda:", e);
   }
   revalidatePath("/painel");
-  redirect(`/painel?ig=${resultado}#post-${id}`);
+  redirect(destino(f, resultado, id));
 }

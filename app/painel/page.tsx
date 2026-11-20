@@ -1,15 +1,17 @@
 import { ManterPosicao } from "./manter-posicao";
 import { redirect } from "next/navigation";
-import { gerarSemana, refazerSemana, salvarPerfil, gerarImagemPost, publicarAgora, assinar, cancelar, reescreverLegendaPost } from "./gerar";
+import { gerarSemana, refazerSemana, salvarPerfil, assinar, cancelar } from "./gerar";
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
-import { ARTES_POR_POST, ARTES_DEMO, contarArtes } from "@/lib/imagem";
-import { VerPost } from "./ver-post";
+import { ARTES_POR_POST, ARTES_DEMO, contarArtes, limiteMensal } from "@/lib/imagem";
+import { CartaoPost, type Historico } from "./cartao-post";
+import { situacao, passaNoFiltro, FILTROS, type Filtro } from "@/lib/status-post";
+import Link from "next/link";
 import { Botao } from "./botao";
 import { EnviarFotos } from "./enviar-fotos";
 import { apagarFoto } from "./fotos";
 import { listarFotos, MAX_FOTOS } from "@/lib/fotos";
-import { aprovarPost, recusarPost, aprovarTodos, salvarLegenda, alternarConfig, sair } from "./actions";
+import { aprovarTodos, alternarConfig, sair } from "./actions";
 
 // Gerar a arte pode levar até ~40 s
 export const maxDuration = 60;
@@ -21,7 +23,14 @@ const AVISOS: Record<string, [string, boolean]> = {
   "ger-erro": ["Não foi possível criar os posts agora. Tente de novo em instantes.", false],
   "img-ok": ["Arte criada! Se não gostar, é só gerar outra.", true],
   "img-erro": ["Não foi possível criar a arte agora. Tente de novo em instantes.", false],
-  "pub-ok": ["Post publicado!", true],
+  "pub-ok": ["Publicado! O Instagram confirmou a publicação.", true],
+  "pub-ocupado": ["Este post já está sendo publicado (ou já foi). Nada foi enviado de novo.", false],
+  "pub-confirmar": ["Confirme a publicação no próprio post para ele ir ao ar.", false],
+  "aprov-ok": ["Aprovado! O post está agendado e sai sozinho na data marcada.", true],
+  "aprov-todos": ["Posts aprovados e agendados.", true],
+  "leg-salva": ["Legenda salva.", true],
+  "hora-ok": ["Data e horário atualizados.", true],
+  "hora-erro": ["Escolha uma data pelo menos 5 minutos à frente (e em até 4 meses).", false],
   "leg-ok": ["Legenda reescrita! Se ainda não gostar, pode pedir outra ou editar à mão.", true],
   "leg-erro": ["Não foi possível reescrever a legenda agora. Tente de novo em instantes.", false],
   "leg-limite": ["Você já reescreveu esta legenda 3 vezes hoje. Edite à mão ou tente amanhã.", false],
@@ -43,14 +52,10 @@ const AVISOS: Record<string, [string, boolean]> = {
   "conta-pessoal": ["Essa conta é pessoal. Mude para Comercial ou Criador nas configurações do Instagram e conecte de novo.", false],
 };
 
-const STATUS: Record<string, [string, string]> = {
-  aguardando_aprovacao: ["Aguardando você", ""],
-  aprovado: ["Aprovado: sai na hora marcada", "ok"],
-  recusado: ["Recusado", "cinza"],
-  publicado: ["Publicado", "ok"],
-  erro: ["Erro ao publicar", ""],
-  rascunho: ["Rascunho", "cinza"],
-};
+const TZ = "America/Sao_Paulo";
+const diaDe = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: TZ }); // AAAA-MM-DD
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const PERIODOS: Record<string, string> = { tudo: "Qualquer data", "7": "Próximos 7 dias", "30": "Próximos 30 dias", passados: "Já passaram" };
 
 const TONS = ["Próximo e acolhedor", "Divertido e descontraído", "Elegante e sofisticado", "Direto e profissional"];
 
@@ -65,8 +70,21 @@ function Chave(p: { campo: string; valor: boolean; titulo: string; descricao: st
   );
 }
 
-export default async function Painel({ searchParams }: { searchParams: Promise<{ ig?: string }> }) {
-  const { ig } = await searchParams;
+type Busca = { ig?: string; f?: string; ver?: string; periodo?: string; m?: string; d?: string };
+
+export default async function Painel({ searchParams }: { searchParams: Promise<Busca> }) {
+  const busca = await searchParams;
+  const { ig } = busca;
+  const filtro: Filtro = (busca.f && busca.f in FILTROS ? busca.f : "ativos") as Filtro;
+  const calendario = busca.ver === "calendario";
+  const periodo = busca.periodo && busca.periodo in PERIODOS ? busca.periodo : "tudo";
+  const agoraMs = Date.now();
+  const hoje = diaDe(new Date(agoraMs).toISOString());
+  const mes = /^\d{4}-\d{2}$/.test(busca.m ?? "") ? busca.m! : (busca.d ?? hoje).slice(0, 7);
+  const [anoCal, mesCal] = mes.split("-").map(Number);
+  // Janela de posts: lista = 60 dias para trás e 120 para frente; calendário = o mês escolhido
+  const desde = calendario ? new Date(Date.UTC(anoCal, mesCal - 1, 1) - 864e5) : new Date(agoraMs - 60 * 864e5);
+  const ate = calendario ? new Date(Date.UTC(anoCal, mesCal, 1) + 864e5) : new Date(agoraMs + 120 * 864e5);
   const supabase = await supabaseDoUsuario();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -77,8 +95,8 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
     supabase.from("contas_instagram").select("id, ig_username")
       .eq("cliente_id", user.id).eq("ativa", true).limit(1),
     supabase.from("posts").select("*").eq("cliente_id", user.id)
-      .gte("agendado_para", new Date().toISOString())
-      .order("agendado_para").limit(14),
+      .gte("agendado_para", desde.toISOString()).lte("agendado_para", ate.toISOString())
+      .order("agendado_para").limit(300),
     supabase.from("planos").select("id, nome, preco_centavos, preco_cheio_centavos, posts_por_semana").eq("ativo", true).order("preco_centavos"),
   ]);
   const reais = (c: number) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -91,7 +109,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
     ? await supabase.from("contas_instagram").select("fb_page_id, fb_page_nome").eq("id", conta.id).maybeSingle()
     : { data: null };
   const paginaFb = fb?.fb_page_id ? (fb.fb_page_nome || "sua Página") : null;
-  const semArtes = { porPost: {} as Record<string, number>, noMes: 0 };
+  const semArtes = { porPost: {} as Record<string, number>, noMes: 0, proximaVaga: null as string | null };
   const artes = posts?.length ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
   const aviso = ig ? AVISOS[ig] : undefined;
   const briefing = lerBriefing(cliente?.briefing);
@@ -103,7 +121,46 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
       hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
     });
   const pendentes = posts?.filter((p) => p.status === "aguardando_aprovacao").length ?? 0;
-  const semArte = posts?.filter((p) => !p.imagem_url && p.status !== "recusado").length ?? 0;
+  const semArte = posts?.filter((p) => !p.imagem_url && !["recusado", "publicado"].includes(p.status) && new Date(p.agendado_para).getTime() > agoraMs).length ?? 0;
+
+  const temFuturos = (posts ?? []).some((p) => p.status !== "recusado" && new Date(p.agendado_para).getTime() > agoraMs);
+  // Situação real de cada post e filtros (status + período)
+  const ctx = { assinante, pausado: !!cfg?.pausado, temConta: !!conta, agora: agoraMs };
+  const comSit = (posts ?? []).map((p) => ({ p, sit: situacao(p, ctx) }));
+  const contagem = Object.fromEntries((Object.keys(FILTROS) as Filtro[]).map((f) => [f, comSit.filter((x) => passaNoFiltro(x.sit, f)).length]));
+  const noPeriodo = (iso: string) => {
+    const t = new Date(iso).getTime();
+    if (periodo === "7") return t >= agoraMs - 3600000 && t <= agoraMs + 7 * 864e5;
+    if (periodo === "30") return t >= agoraMs - 3600000 && t <= agoraMs + 30 * 864e5;
+    if (periodo === "passados") return t < agoraMs;
+    return true;
+  };
+  const filtrados = comSit.filter((x) => passaNoFiltro(x.sit, filtro) && (calendario || noPeriodo(x.p.agendado_para)));
+  // Lista: pendências primeiro (o que precisa do cliente), depois por data; publicados do mais novo para o mais antigo
+  const peso = (k: string) => (["falhou", "pendente", "aprovado_parado"].includes(k) ? 0 : 1);
+  const lista = calendario ? [] : [...filtrados].sort((a, b) =>
+    filtro === "publicados" || periodo === "passados"
+      ? b.p.agendado_para.localeCompare(a.p.agendado_para)
+      : peso(a.sit.chave) - peso(b.sit.chave) || a.p.agendado_para.localeCompare(b.p.agendado_para));
+  // Calendário
+  const porDia = new Map<string, typeof filtrados>();
+  filtrados.forEach((x) => { const k = diaDe(x.p.agendado_para); porDia.set(k, [...(porDia.get(k) ?? []), x]); });
+  const diaSel = calendario ? (busca.d && busca.d.startsWith(mes) ? busca.d : porDia.has(hoje) && hoje.startsWith(mes) ? hoje : [...porDia.keys()].sort()[0] ?? "") : "";
+  const mostrados = calendario ? porDia.get(diaSel) ?? [] : lista;
+  // Histórico dos posts mostrados (sem a migração 11, fica vazio)
+  const { data: hist } = mostrados.length
+    ? await supabase.from("post_historico").select("post_id, acao, detalhe, quem, em").in("post_id", mostrados.map((x) => x.p.id)).order("em", { ascending: false }).limit(400)
+    : { data: [] as Historico[] };
+  const limiteMes = limiteMensal(planos?.find((pl) => pl.id === cliente?.plano_id)?.posts_por_semana);
+  // Endereço da visão atual (para os botões voltarem para a mesma aba)
+  const link = (mudar: Partial<Busca>) => {
+    const q = new URLSearchParams();
+    const v = { f: filtro, ver: calendario ? "calendario" : undefined, periodo: periodo === "tudo" ? undefined : periodo, m: calendario ? mes : undefined, d: diaSel || undefined, ...mudar };
+    for (const [k, val] of Object.entries(v)) if (val && k !== "ig") q.set(k, val);
+    return `?${q}`;
+  };
+  const vista = link({});
+  const corDia: Record<string, string> = { pendente: "#d9a400", falhou: "var(--err)", aprovado_parado: "#d9a400", agendado: "#2563eb", na_fila: "#2563eb", publicando: "#2563eb", publicado: "var(--ok)", recusado: "var(--mut)", rascunho: "var(--mut)" };
 
   return (
     <>
@@ -227,10 +284,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
           </>
         )}
 
-        <h2>Posts da semana</h2>
+        <h2 id="publicacoes">Publicações</h2>
         {cliente?.ramo && (
           <div className="acoes" style={{ marginBottom: 14 }}>
-            {!posts?.length ? (
+            {!temFuturos ? (
               <form action={gerarSemana}><Botao className="btn">{assinante ? "Criar posts da semana" : "Criar minha semana grátis"}</Botao></form>
             ) : assinante ? (
               <form action={refazerSemana}>
@@ -240,95 +297,92 @@ export default async function Painel({ searchParams }: { searchParams: Promise<{
             ) : null}
           </div>
         )}
-        {!posts?.length ? (
+
+        {pendentes > 0 && (
+          <div className="aviso pend" role="status">
+            <span>{pendentes === 1 ? "1 post está aguardando a sua aprovação." : `${pendentes} posts estão aguardando a sua aprovação.`}</span>
+            <span className="acoes" style={{ margin: 0 }}>
+              {filtro !== "pendentes" && <Link className="btn sm" href={link({ f: "pendentes", ver: undefined, periodo: undefined, d: undefined, m: undefined }) + "#publicacoes"}>Ver pendentes</Link>}
+              <form action={aprovarTodos}><input type="hidden" name="vista" value={vista} /><Botao className="btn sm ghost">Aprovar todos ({pendentes})</Botao></form>
+            </span>
+          </div>
+        )}
+        {semArte > 0 && (
+          <div className="aviso" role="status">
+            {semArte === 1 ? "1 post ainda está sem arte." : `${semArte} posts ainda estão sem arte.`} Toque em "Criar arte" para ver antes de aprovar (leva uns 30 segundos). Se aprovar sem arte, ela é criada antes de publicar.
+          </div>
+        )}
+
+        <nav className="filtros" aria-label="Filtrar publicações por situação">
+          {(Object.keys(FILTROS) as Filtro[]).map((f) => (
+            <Link key={f} href={link({ f, d: undefined }) + "#publicacoes"} className={`filtro${f === filtro ? " ativo" : ""}`} aria-current={f === filtro ? "page" : undefined}>
+              {FILTROS[f].rotulo} <b>{contagem[f]}</b>
+            </Link>
+          ))}
+        </nav>
+        <div className="filtros2">
+          <span className="alternar" role="group" aria-label="Forma de ver">
+            <Link href={link({ ver: undefined, m: undefined, d: undefined }) + "#publicacoes"} className={!calendario ? "ativo" : ""}>Lista</Link>
+            <Link href={link({ ver: "calendario", m: mes, d: undefined }) + "#publicacoes"} className={calendario ? "ativo" : ""}>Calendário</Link>
+          </span>
+          {!calendario && (
+            <span className="alternar" role="group" aria-label="Período">
+              {Object.entries(PERIODOS).map(([k, r]) => (
+                <Link key={k} href={link({ periodo: k === "tudo" ? undefined : k }) + "#publicacoes"} className={k === periodo ? "ativo" : ""}>{r}</Link>
+              ))}
+            </span>
+          )}
+        </div>
+
+        {calendario && (() => {
+          const primeiro = new Date(Date.UTC(anoCal, mesCal - 1, 1)).getUTCDay();
+          const total = new Date(Date.UTC(anoCal, mesCal, 0)).getUTCDate();
+          const ant = new Date(Date.UTC(anoCal, mesCal - 2, 1)).toISOString().slice(0, 7);
+          const prox = new Date(Date.UTC(anoCal, mesCal, 1)).toISOString().slice(0, 7);
+          return (
+            <div className="card">
+              <div className="cal-topo">
+                <Link className="btn sm ghost" href={link({ m: ant, d: undefined }) + "#publicacoes"} aria-label="Mês anterior">‹</Link>
+                <b>{MESES[mesCal - 1]} de {anoCal}</b>
+                <Link className="btn sm ghost" href={link({ m: prox, d: undefined }) + "#publicacoes"} aria-label="Próximo mês">›</Link>
+              </div>
+              <div className="cal">
+                {["D", "S", "T", "Q", "Q", "S", "S"].map((x, i) => <span key={i} className="cal-sem">{x}</span>)}
+                {Array.from({ length: primeiro }).map((_, i) => <span key={`v${i}`} />)}
+                {Array.from({ length: total }).map((_, i) => {
+                  const k = `${mes}-${String(i + 1).padStart(2, "0")}`, ps = porDia.get(k);
+                  return (
+                    <Link key={k} href={link({ d: k }) + "#publicacoes"} className={`cal-dia${k === diaSel ? " sel" : ""}${k === hoje ? " hoje" : ""}`}
+                      aria-label={`Dia ${i + 1}${ps ? `, ${ps.length} ${ps.length === 1 ? "post" : "posts"}` : ""}`}>
+                      {i + 1}
+                      {ps && <span className="cal-pontos">{ps.slice(0, 3).map((x, j) => <i key={j} style={{ background: corDia[x.sit.chave] }} />)}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+              <p className="legenda-cal"><i style={{ background: "#d9a400" }} />aguardando <i style={{ background: "#2563eb" }} />agendado <i style={{ background: "var(--ok)" }} />publicado <i style={{ background: "var(--err)" }} />falhou</p>
+            </div>
+          );
+        })()}
+
+        {calendario && <h3 className="dia-titulo">{diaSel ? `Dia ${diaSel.split("-").reverse().join("/")}` : "Nenhum post neste mês com este filtro"}</h3>}
+
+        {!posts?.length && !calendario ? (
           <div className="card">
             <p style={{ margin: 0 }}>
               {cliente?.ramo ? "Ainda não há posts. Clique no botão acima e a Scrull cria a sua semana." : "Preencha o briefing da marca acima para a Scrull começar a criar seus posts."}
             </p>
           </div>
+        ) : !mostrados.length ? (
+          <div className="card"><p style={{ margin: 0 }} className="sub">Nenhuma publicação {calendario ? "neste dia" : "com este filtro"}.</p></div>
         ) : (
-          <>
-            {semArte > 0 && (
-              <div className="aviso" role="status">
-                {semArte === 1 ? "1 post ainda está sem arte." : `${semArte} posts ainda estão sem arte.`} Clique em "Criar arte" em cada um (leva uns 30 segundos).
-              </div>
-            )}
-            {pendentes > 0 && (
-              <form action={aprovarTodos} style={{ marginBottom: 14 }}>
-                <Botao className="btn">Aprovar todos ({pendentes})</Botao>
-              </form>
-            )}
-            {posts.map((p) => {
-              const [rotulo, cor] = STATUS[p.status] ?? [p.status, ""];
-              const editavel = ["aguardando_aprovacao", "aprovado", "recusado", "erro"].includes(p.status);
-              return (
-                <div className="card post" key={p.id} id={`post-${p.id}`}>
-                  <div className="arte">
-                    {p.imagem_url ? (
-                      <VerPost imagem={p.imagem_url} titulo={p.titulo_arte ?? ""} legenda={p.legenda} hashtags={p.hashtags ?? []}
-                        perfil={conta?.ig_username ?? undefined} quando={quando(p.agendado_para)}>
-                        {editavel && p.status !== "aprovado" && (
-                          <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn">Aprovar este post</Botao></form>
-                        )}
-                        {editavel && p.status !== "recusado" && (
-                          <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn ghost">Recusar</Botao></form>
-                        )}
-                      </VerPost>
-                    ) : (
-                      <div>
-                        <b>{p.titulo_arte}</b>
-                        {p.subtitulo && <span>{p.subtitulo}</span>}
-                        {!!p.topicos?.length && <ul>{p.topicos.map((t: string) => <li key={t}>✓ {t}</li>)}</ul>}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="meta"><span>{quando(p.agendado_para)}</span><span className={`badge ${cor}`}>{rotulo}</span></div>
-                    {p.tema && <p className="tema">{p.tema}</p>}
-                    <p className="legenda">{p.legenda}</p>
-                    {!!p.hashtags?.length && <p className="tags">{p.hashtags.join(" ")}</p>}
-                    {p.erro_msg && <p className="erro">{p.erro_msg}</p>}
-                    {p.fb_post_id && <p className="sub">Saiu também no Facebook.</p>}
-                    {p.fb_erro_msg && <p className="erro">{p.fb_erro_msg}</p>}
-                    {editavel && (
-                      <div className="acoes">
-                        {(assinante ? (artes.porPost[p.id] ?? 0) < ARTES_POR_POST : artes.noMes < ARTES_DEMO) ? (
-                          <form action={gerarImagemPost}>
-                            <input type="hidden" name="id" value={p.id} />
-                            <Botao className={`btn sm ${p.imagem_url ? "ghost" : ""}`}>
-                              {p.imagem_url ? `Trocar a arte (${assinante ? ARTES_POR_POST - (artes.porPost[p.id] ?? 0) : ARTES_DEMO - artes.noMes} ${(assinante ? ARTES_POR_POST - (artes.porPost[p.id] ?? 0) : ARTES_DEMO - artes.noMes) === 1 ? "troca restante" : "trocas restantes"})` : "Criar arte"}
-                            </Botao>
-                          </form>
-                        ) : (
-                          assinante
-                            ? <span className="badge cinza">Limite de artes deste post</span>
-                            : <span className="assine">Assine para ter a criação de artes e a postagem automatizada, sem esforço e sem gastar seu tempo.</span>
-                        )}
-                        {assinante && conta && p.imagem_url && (
-                          <form action={publicarAgora}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ig-agora">Publicar agora</Botao></form>
-                        )}
-                        {p.status !== "aprovado" && (
-                          <form action={aprovarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm">Aprovar</Botao></form>
-                        )}
-                        {p.status !== "recusado" && (
-                          <form action={recusarPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ghost">Recusar</Botao></form>
-                        )}
-                        <form action={reescreverLegendaPost}><input type="hidden" name="id" value={p.id} /><Botao className="btn sm ghost">Reescrever legenda</Botao></form>
-                        <details>
-                          <summary>Editar legenda</summary>
-                          <form action={salvarLegenda}>
-                            <input type="hidden" name="id" value={p.id} />
-                            <textarea className="campo" name="legenda" rows={5} defaultValue={p.legenda} aria-label="Legenda do post" />
-                            <Botao className="btn sm">Salvar legenda</Botao>
-                          </form>
-                        </details>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </>
+          mostrados.map(({ p, sit }) => (
+            <CartaoPost key={p.id} post={p} sit={sit} perfil={conta?.ig_username ?? undefined} assinante={assinante} temConta={!!conta}
+              facebook={!!paginaFb && (cfg?.publicar_facebook ?? true)} vista={vista}
+              historico={((hist ?? []) as Historico[]).filter((h) => h.post_id === p.id)}
+              artes={{ usadasNoPost: artes.porPost[p.id] ?? 0, porPost: ARTES_POR_POST, noMes: artes.noMes, limiteMes,
+                proximaVaga: artes.proximaVaga, demo: !assinante, demoTotal: ARTES_DEMO }} />
+          ))
         )}
 
         <h2>Ajustes</h2>
