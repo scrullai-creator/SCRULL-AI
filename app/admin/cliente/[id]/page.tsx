@@ -34,8 +34,8 @@ export default async function Calendario({ params, searchParams }: { params: Pro
   const prox = new Date(Date.UTC(ano, nm, 1)).toISOString().slice(0, 7);
   const sel = d && d.startsWith(mes) ? d : (porDia.has(hoje) && hoje.startsWith(mes) ? hoje : [...porDia.keys()].filter((k) => k.startsWith(mes)).sort()[0] ?? "");
   const doDia = porDia.get(sel) ?? [];
-  const cor: Record<string, string> = { aprovado: "var(--ok)", publicado: "var(--p)", aguardando_aprovacao: "#d9a400", recusado: "var(--mut)", erro: "var(--err)" };
-  const nomeStatus: Record<string, string> = { aprovado: "Aprovado", publicado: "Publicado", aguardando_aprovacao: "Aguardando", recusado: "Recusado", erro: "Erro" };
+  const cor: Record<string, string> = { aprovado: "var(--ok)", publicado: "var(--p)", publicando: "#0369a1", aguardando_aprovacao: "#d9a400", recusado: "var(--mut)", erro: "var(--err)" };
+  const nomeStatus: Record<string, string> = { aprovado: "Agendado", publicado: "Publicado", publicando: "Publicando", aguardando_aprovacao: "Aguardando", recusado: "Recusado", erro: "Erro" };
 
   return (
     <>

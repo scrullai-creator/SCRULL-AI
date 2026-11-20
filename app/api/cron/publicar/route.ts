@@ -3,7 +3,8 @@
 // e sem "Pausar publicações" ligado. Se o post ainda não tem arte, cria antes.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { publicarPost } from "@/lib/publicar";
+import { publicarPost, PostOcupado } from "@/lib/publicar";
+import { registrar } from "@/lib/historico";
 import { gerarArteDoPost } from "@/lib/imagem";
 
 export const maxDuration = 60;
@@ -20,6 +21,15 @@ async function rodar(req: NextRequest) {
 
   const db = supabaseAdmin();
   const agora = new Date();
+
+  // Posts presos em "publicando" há mais de 10 minutos (a função caiu no meio): viram "erro" com um aviso.
+  // Não tenta de novo sozinho; a nova tentativa confere no Instagram se o post chegou a sair.
+  const presos = await db.from("posts").update({
+    status: "erro", publicando_desde: null,
+    erro_msg: "A publicação foi interrompida. Toque em \"Tentar de novo\": antes de publicar, a Scrull confere no Instagram se o post já saiu.",
+  }).eq("status", "publicando").lt("publicando_desde", new Date(agora.getTime() - 10 * 60000).toISOString()).select("id, cliente_id");
+  for (const p of presos.data ?? []) await registrar(p.id, p.cliente_id, "falhou", "publicação interrompida", "automático");
+
   const limite = new Date(agora.getTime() - ATRASO_MAXIMO_H * 3600 * 1000);
   const { data: fila, error } = await db.from("posts")
     .select("id, cliente_id, imagem_url, clientes!inner(assinatura), erro_msg")
@@ -44,13 +54,18 @@ async function rodar(req: NextRequest) {
   const resultado: { id: string; ok: boolean; motivo?: string }[] = [];
   for (const p of (fila ?? []).filter((p) => !pausados.has(p.cliente_id)).slice(0, POR_RODADA)) {
     try {
-      if (!p.imagem_url) await gerarArteDoPost(p.id, p.cliente_id);
-      await publicarPost(p.id, p.cliente_id);
+      if (!p.imagem_url) {
+        await gerarArteDoPost(p.id, p.cliente_id);
+        await registrar(p.id, p.cliente_id, "arte", "arte criada antes de publicar", "automático");
+      }
+      await publicarPost(p.id, p.cliente_id, "automático");
       resultado.push({ id: p.id, ok: true });
     } catch (e) {
       const motivo = e instanceof Error ? e.message : "erro";
+      if (e instanceof PostOcupado) { resultado.push({ id: p.id, ok: false, motivo }); continue; }
       // Marca como erro para não tentar de novo a cada rodada; o cliente vê o motivo no painel
-      await db.from("posts").update({ status: "erro", erro_msg: motivo.slice(0, 300) }).eq("id", p.id);
+      // (a publicação já marca sozinha; aqui cobre a falha ao criar a arte)
+      await db.from("posts").update({ status: "erro", erro_msg: motivo.slice(0, 300) }).eq("id", p.id).neq("status", "publicado");
       console.error("Fila de publicação: post", p.id, motivo);
       resultado.push({ id: p.id, ok: false, motivo });
     }

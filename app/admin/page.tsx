@@ -10,8 +10,9 @@ export const maxDuration = 60;
 const CUSTO_ARTE = 0.25; // R$ por arte (estimativa)
 const reais = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-export default async function Admin() {
+export default async function Admin({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   await exigirAdmin();
+  const { f } = await searchParams;
   const db = supabaseAdmin();
   const [{ data: clientes }, { data: posts }, { data: contas }, { data: planos }] = await Promise.all([
     db.from("clientes").select("id, nome_empresa, ramo, assinatura, plano_id, criado_em").order("criado_em"),
@@ -50,7 +51,14 @@ export default async function Admin() {
           <div className="card"><b>{reais(receita)}</b><span>mensalidades ativas (pilotos sem cobrança incluídos)</span></div>
         </div>
 
-        {(clientes ?? []).map((c) => {
+        <nav className="filtros" aria-label="Filtrar clientes">
+          {[["", "Todos os clientes"], ["pendencias", "Com posts aguardando aprovação"], ["falhas", "Com falhas"]].map(([k, r]) => {
+            const n = (clientes ?? []).filter((c) => !k || por(c.id).some((p) => p.status === (k === "falhas" ? "erro" : "aguardando_aprovacao"))).length;
+            return <Link key={k} href={k ? `?f=${k}` : "/admin"} className={`filtro${(f ?? "") === k ? " ativo" : ""}`}>{r} <b>{n}</b></Link>;
+          })}
+        </nav>
+
+        {(clientes ?? []).filter((c) => !f || por(c.id).some((p) => p.status === (f === "falhas" ? "erro" : "aguardando_aprovacao"))).map((c) => {
           const meus = por(c.id), ig = contas?.find((x) => x.cliente_id === c.id);
           return (
             <div className="card ad-cli" key={c.id}>
@@ -62,7 +70,8 @@ export default async function Admin() {
                 <span className={`badge ${c.assinatura === "ativa" ? "ok" : "cinza"}`}>{c.assinatura}</span>
               </div>
               <p className="ad-linha">
-                {meus.length} posts · {meus.filter((p) => p.status === "aprovado").length} aprovados · {meus.filter((p) => p.status === "publicado").length} publicados · {artes[c.id] ?? 0} artes no mês
+                {meus.length} posts · {meus.filter((p) => p.status === "aguardando_aprovacao").length} aguardando · {meus.filter((p) => p.status === "aprovado" && new Date(p.agendado_para).getTime() > agora).length} agendados · {meus.filter((p) => p.status === "publicado").length} publicados
+                {meus.some((p) => p.status === "erro") && <b style={{ color: "var(--err)" }}> · {meus.filter((p) => p.status === "erro").length} com falha</b>} · {artes[c.id] ?? 0} artes no mês
               </p>
               <div className="ad-acoes">
                 <Link className="btn sm" href={`/admin/cliente/${c.id}`}>Ver calendário</Link>

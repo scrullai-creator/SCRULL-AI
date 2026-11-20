@@ -62,6 +62,9 @@ export const ARTES_DEMO = Number(process.env.LIMITE_ARTES_DEMO ?? 2);
 
 export class LimiteDeArtes extends Error {}
 
+// Artes por mês no plano: 2 por post previsto (ex.: 7 posts por semana = 56 artes em 30 dias)
+export const limiteMensal = (postsPorSemana?: number | null) => (postsPorSemana ?? 7) * 4 * ARTES_POR_POST_NO_MES;
+
 // Conta as artes já geradas olhando os arquivos guardados (nome: <post>-<data>.jpg)
 export async function contarArtes(clienteId: string) {
   const db = supabaseAdmin();
@@ -71,12 +74,16 @@ export async function contarArtes(clienteId: string) {
   const artes = (data ?? []).filter((f) => !f.name.startsWith("logo."));
   const porPost: Record<string, number> = {};
   let noMes = 0;
+  let maisAntiga: number | null = null; // a arte mais antiga dentro dos últimos 30 dias
   for (const f of artes) {
     const postId = f.name.replace(/-\d+\.jpg$/, "");
     porPost[postId] = (porPost[postId] ?? 0) + 1;
-    if (new Date(f.created_at ?? 0).getTime() >= umMesAtras) noMes++;
+    const t = new Date(f.created_at ?? 0).getTime();
+    if (t >= umMesAtras) { noMes++; if (maisAntiga === null || t < maisAntiga) maisAntiga = t; }
   }
-  return { porPost, noMes };
+  // O limite mensal conta os últimos 30 dias: a próxima vaga abre quando a arte mais antiga completa 30 dias
+  const proximaVaga = maisAntiga !== null ? new Date(maisAntiga + 30 * 86400000).toISOString() : null;
+  return { porPost, noMes, proximaVaga };
 }
 
 // Gera a arte de um post e salva a URL nele
@@ -93,8 +100,7 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   if (cliente?.assinatura !== "ativa" && contagem.noMes >= ARTES_DEMO) {
     throw new LimiteDeArtes(`A demonstração inclui ${ARTES_DEMO} artes`);
   }
-  const porSemana = (cliente as any)?.planos?.posts_por_semana ?? 7;
-  const limiteMes = porSemana * 4 * ARTES_POR_POST_NO_MES;
+  const limiteMes = limiteMensal((cliente as any)?.planos?.posts_por_semana);
   if ((contagem.porPost[postId] ?? 0) >= ARTES_POR_POST) {
     throw new LimiteDeArtes(`Este post já tem ${ARTES_POR_POST} artes geradas`);
   }
