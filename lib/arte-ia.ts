@@ -132,6 +132,46 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
   }
 }
 
+// Revisão só da FOTO (antes de o app escrever título e logo por cima), para as artes
+// montadas pelo modelo do app: nitidez, proporções, enquadramento e apelo.
+export async function revisarFoto(foto: Buffer, empresa: string, ramo: string): Promise<Revisao> {
+  const jpg = await sharp(foto).resize(640, 640, { fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: MODELO_REVISAO, max_tokens: 2000, output_config: { effort: "low" },
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpg.toString("base64") } },
+          { type: "text", text:
+            `Você é fotógrafo publicitário e diretor de arte. Esta foto vai virar um post de Instagram de "${empresa}" (${ramo}); ` +
+            `o título e a logo serão colocados depois pelo app.\n` +
+            `Reprove se: estiver borrada ou sem nitidez; houver mãos, dedos, rostos ou objetos deformados ou com proporção errada; ` +
+            `houver letras, números, logos ou marcas d'água; o assunto principal não estiver claro; o enquadramento estiver torto ou cortando o assunto de forma estranha; ` +
+            `o produto ou a cena for genérico e sem apelo; não combinar com esse tipo de negócio; parecer artificial ou amador.\n` +
+            `Responda SOMENTE JSON: {"nota": 0-10, "problemas": "lista curta em inglês do que corrigir, vazia se nada"}` },
+        ],
+      }],
+    }),
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => null);
+    console.error("Revisão da foto: erro", res.status, e?.error?.message ?? "");
+    return { aprovada: true, nota: -1, problemas: "" };
+  }
+  const j = await res.json();
+  const texto: string = (j.content ?? []).map((b: any) => b.text ?? "").join("");
+  try {
+    const r = JSON.parse(texto.slice(texto.indexOf("{"), texto.lastIndexOf("}") + 1));
+    const nota = Number(r.nota) || 0;
+    return { aprovada: nota >= 7, nota, problemas: String(r.problemas ?? "").slice(0, 600) };
+  } catch {
+    return { aprovada: true, nota: -1, problemas: "" };
+  }
+}
+
 // Gera, revisa e, se preciso e houver tempo, refaz uma vez. Devolve a melhor versão.
 export async function criarArteCompleta(p: PedidoArte, tempoLimiteMs = 40_000): Promise<{ arte: Buffer; revisao: Revisao }> {
   const inicio = Date.now();

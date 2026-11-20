@@ -102,3 +102,71 @@ export function estiloDoPost(segmento: Segmento, agendadoPara: string | null | u
   const dia = Math.floor(Date.parse(agendadoPara ?? "") / 86400000) || 0;
   return lista[(((dia + trocas) % lista.length) + lista.length) % lista.length];
 }
+
+// ---------------------------------------------------------------------------
+// Memória visual: cada post guarda como foi feito (estilo, enquadramento, layout e uma
+// "impressão digital" da imagem). A próxima arte do MESMO cliente evita o que foi usado
+// por último. A memória é sempre individual: nunca compara com outro cliente.
+
+export type Visual = {
+  segmento?: Segmento;
+  estilo?: number;        // índice no manual do segmento
+  enquadramento?: number; // índice em ENQUADRAMENTOS
+  layout?: string | null;
+  origem?: "ia-completa" | "modelo" | "foto-cliente";
+  nota?: number;          // nota da revisão de qualidade (0 a 10; -1 = sem revisão)
+  hash?: string;          // impressão digital da imagem (64 bits em hexadecimal)
+};
+
+// Ângulos e enquadramentos de fotografia publicitária, para a foto não sair sempre igual
+export const ENQUADRAMENTOS = [
+  "Camera: tight close-up of the main subject, filling the frame, crisp detail and texture.",
+  "Camera: top-down flat lay, everything neatly arranged, even soft light.",
+  "Camera: 45-degree three-quarter angle, subject sharp, background softly blurred.",
+  "Camera: eye-level wide shot showing the place or the context around the subject.",
+  "Camera: low angle, subject heroic and dominant, dramatic but natural light.",
+  "Camera: hands in action working with or holding the product, natural and candid.",
+];
+
+// Escolhe o item menos usado recentemente (o que está há mais tempo sem aparecer).
+// "recentes" vem do mais novo para o mais antigo (a arte anterior deste mesmo post entra
+// em primeiro, então trocar de arte sempre leva a outra opção). Empates giram com o "gancho".
+function menosUsado(total: number, recentes: (number | undefined)[], gancho: number, trocas: number) {
+  const ultimoUso = (i: number) => {
+    const p = recentes.indexOf(i);
+    return p < 0 ? 999 : p; // nunca usado = melhor opção
+  };
+  const ordem = Array.from({ length: total }, (_, k) => (gancho + trocas + k) % total);
+  ordem.sort((a, b) => ultimoUso(b) - ultimoUso(a));
+  return ordem[0];
+}
+
+// Direção de arte da próxima peça, levando em conta a memória visual do cliente
+export function escolherDirecao(segmento: Segmento, recentes: Visual[], gancho: number, trocas: number) {
+  const lista = ESTILOS[segmento];
+  const doSegmento = recentes.filter((v) => v.segmento === segmento);
+  const estilo = menosUsado(lista.length, doSegmento.map((v) => v.estilo), gancho, trocas);
+  const enquadramento = menosUsado(ENQUADRAMENTOS.length, recentes.map((v) => v.enquadramento), gancho * 7, trocas);
+  return { estilo, textoEstilo: lista[estilo], enquadramento, textoEnquadramento: ENQUADRAMENTOS[enquadramento] };
+}
+
+// Impressão digital da imagem (dHash 8x8): fotos quase iguais têm impressões quase iguais
+export async function impressaoDigital(img: Buffer): Promise<string> {
+  const sharp = (await import("sharp")).default;
+  const { data } = await sharp(img).grayscale().resize(9, 8, { fit: "fill" }).raw().toBuffer({ resolveWithObject: true });
+  let bits = "";
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits += data[y * 9 + x] > data[y * 9 + x + 1] ? "1" : "0";
+  return BigInt("0b" + bits).toString(16).padStart(16, "0");
+}
+
+// Quantos dos 64 bits diferem: abaixo de ~10 as duas imagens são praticamente a mesma composição
+export function distancia(a: string, b: string): number {
+  let x = BigInt("0x" + a) ^ BigInt("0x" + b);
+  let n = 0;
+  while (x) { n += Number(x & 1n); x >>= 1n; }
+  return n;
+}
+
+export function parecidaDemais(hash: string, recentes: Visual[], limite = 10) {
+  return recentes.some((v) => v.hash && distancia(hash, v.hash) <= limite);
+}

@@ -4,8 +4,8 @@
 import { supabaseAdmin } from "./supabase";
 import { montarArte, corDaMarca, fonteDoRamo } from "./arte";
 import { montarArteScrull, modeloScrull, LUZ_SEM } from "./arte-scrull";
-import { criarArteCompleta, aplicarLogo } from "./arte-ia";
-import { segmentoDoRamo, estiloDoPost } from "./direcao-arte";
+import { criarArteCompleta, aplicarLogo, revisarFoto } from "./arte-ia";
+import { segmentoDoRamo, escolherDirecao, impressaoDigital, parecidaDemais, type Visual } from "./direcao-arte";
 import sharp from "sharp";
 import { lerBriefing } from "./briefing";
 import { listarFotos, prepararFoto } from "./fotos";
@@ -81,6 +81,7 @@ export async function contarArtes(clienteId: string) {
 
 // Gera a arte de um post e salva a URL nele
 export async function gerarArteDoPost(postId: string, clienteId: string) {
+  const inicio = Date.now();
   const db = supabaseAdmin();
   const [{ data: post }, { data: cliente }, contagem] = await Promise.all([
     db.from("posts").select("id, prompt_imagem, titulo_arte, topicos, layout, subtitulo, agendado_para").eq("id", postId).eq("cliente_id", clienteId).single(),
@@ -117,20 +118,25 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const logo = ehScrull ? null : await lerLogo(cliente?.logo_url);
   const corHex = briefing.cores ? corDaMarca(briefing.cores) : (await corDaLogo(logo)) ?? null;
 
+  // Memória visual DESTE cliente: a próxima arte evita o estilo, o ângulo e a composição usados por último
+  const memoria = await lerMemoria(clienteId, postId);
+  const segmento = ehScrull ? "tecnologia" : segmentoDoRamo(cliente?.ramo ?? "");
+  const direcao = escolherDirecao(segmento, memoria, gancho, usadas);
+  const visual: Visual = { segmento, estilo: direcao.estilo, enquadramento: direcao.enquadramento, layout: post.layout };
+
   // Arte completa pela IA (foto + texto + composição numa peça só, revisada pelo Claude).
   // Por enquanto ligada só no próprio Scrull; ARTE_IA_TODOS=1 liga para todos os clientes.
   let pronta: Buffer | null = null;
   if (ehScrull || process.env.ARTE_IA_TODOS === "1") {
     try {
-      const segmento = ehScrull ? "tecnologia" : segmentoDoRamo(cliente?.ramo ?? "");
       const mascote = ehScrull ? await lerMascote() : null;
-      const { arte } = await criarArteCompleta({
+      const { arte, revisao } = await criarArteCompleta({
         empresa: cliente?.nome_empresa ?? "", ramo: ehScrull ? "app que cria e posta no Instagram de pequenos negócios" : (cliente?.ramo ?? ""),
-        estilo: estiloDoPost(segmento, post.agendado_para, usadas),
+        estilo: direcao.textoEstilo,
         cores: ehScrull ? "violet #7c3aed, electric blue #2563eb, cyan #06b6d4, white; vary the mix per post"
           : [briefing.cores, corHex].filter(Boolean).join(" / "),
         titulo, subtitulo: post.subtitulo ?? "", topicos: post.layout === "faixa" ? post.topicos ?? [] : [],
-        cena: cena + (ehScrull ? " Small business context, no food, no pizza." : ""),
+        cena: cena + " " + direcao.textoEnquadramento + (ehScrull ? " Small business context, no food, no pizza." : ""),
         referencias: [
           ...(escolhida ? [{ bytes: escolhida, tipo: "produto" as const }] : []),
           ...(mascote ? [{ bytes: mascote, tipo: "mascote" as const }] : []),
@@ -139,6 +145,9 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
         assinatura: ehScrull ? "@scrull.ai" : undefined,
       }, 45_000);
       pronta = await aplicarLogo(arte, logo);
+      visual.origem = "ia-completa";
+      visual.nota = revisao.nota;
+      visual.hash = await impressaoDigital(arte);
     } catch (e: any) {
       console.error("Arte IA falhou; usando o modelo de arte:", e?.message);
     }
@@ -156,7 +165,16 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   } else {
     // Clientes: cada um com a própria identidade (cores do briefing ou da logo, fonte pelo ramo,
     // fotos reais que ele enviou). Nada do Scrull e nada de outro cliente entra aqui.
-    const foto = escolhida ?? await gerarFoto(cena);
+    let foto: Buffer;
+    if (escolhida) {
+      foto = escolhida;
+      visual.origem = "foto-cliente";
+    } else {
+      foto = await fotoRevisada(cena + " " + direcao.textoEnquadramento, cliente?.nome_empresa ?? "", cliente?.ramo ?? "", memoria, inicio, visual);
+      visual.origem = "modelo";
+    }
+    visual.hash ??= await impressaoDigital(foto);
+    visual.layout = escolherLayout(post.layout, gancho, usadas);
     bytes = await montarArte({
       fundoJpeg: foto, titulo, topicos: post.topicos ?? [],
       layout: escolherLayout(post.layout, gancho, usadas), subtitulo: post.subtitulo ?? "",
@@ -167,9 +185,42 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   }
   const url = await guardarArquivo(`${clienteId}/${postId}-${Date.now()}.jpg`, bytes, "image/jpeg");
 
-  const { error } = await db.from("posts").update({ imagem_url: url }).eq("id", postId);
+  let { error } = await db.from("posts").update({ imagem_url: url, visual }).eq("id", postId);
+  // Se a migração 10 ainda não rodou (coluna "visual" não existe), salva só a arte
+  if (error && /visual/i.test(error.message)) ({ error } = await db.from("posts").update({ imagem_url: url }).eq("id", postId));
   if (error) throw error;
   return url;
+}
+
+// Últimas artes deste cliente (a arte anterior deste mesmo post vem primeiro). Sem a coluna, memória vazia.
+async function lerMemoria(clienteId: string, postId: string): Promise<Visual[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db.from("posts").select("id, visual")
+    .eq("cliente_id", clienteId).not("visual", "is", null)
+    .order("agendado_para", { ascending: false }).limit(8);
+  if (error || !data) return [];
+  const deste = data.filter((p) => p.id === postId);
+  return [...deste, ...data.filter((p) => p.id !== postId)].map((p) => p.visual as Visual);
+}
+
+// Foto criada pela IA para o modelo do app: o Claude revisa (nitidez, proporção, enquadramento, apelo)
+// e a memória confere se não ficou parecida demais com uma arte recente. Se reprovar e ainda houver
+// tempo, refaz UMA vez com as correções (para não gastar o saldo) e fica com a melhor das duas.
+async function fotoRevisada(cena: string, empresa: string, ramo: string, memoria: Visual[], inicio: number, visual: Visual) {
+  const foto = await gerarFoto(cena);
+  const [rev, hash] = await Promise.all([revisarFoto(foto, empresa, ramo), impressaoDigital(foto)]);
+  const repetida = parecidaDemais(hash, memoria);
+  console.log("Foto revisão:", empresa, rev.nota, rev.aprovada ? "aprovada" : `reprovada: ${rev.problemas}`, repetida ? "(parecida com arte recente)" : "");
+  visual.nota = rev.nota; visual.hash = hash;
+  if ((rev.aprovada && !repetida) || Date.now() - inicio > 22_000) return foto;
+
+  const correcoes = [rev.aprovada ? "" : rev.problemas,
+    repetida ? "Too similar to a recent post: use a clearly different camera angle, setting and color mood." : ""].filter(Boolean).join(" ");
+  const nova = await gerarFoto(`${cena} FIX THESE PROBLEMS: ${correcoes}`);
+  const [rev2, hash2] = await Promise.all([revisarFoto(nova, empresa, ramo), impressaoDigital(nova)]);
+  console.log("Foto revisão (2ª):", empresa, rev2.nota, rev2.aprovada ? "aprovada" : `reprovada: ${rev2.problemas}`);
+  if (rev2.nota >= rev.nota || repetida) { visual.nota = rev2.nota; visual.hash = hash2; return nova; }
+  return foto;
 }
 
 // Formato da arte: o que a IA escolheu para o post (ou um sorteado pelo id, para posts antigos

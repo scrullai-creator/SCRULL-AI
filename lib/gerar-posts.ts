@@ -50,7 +50,7 @@ export type DadosParaGerar = {
   briefing: Briefing;
   temLogo: boolean;
   // Posts recentes (título e tema), para não repetir assunto
-  historico: { titulo: string; tema?: string | null }[];
+  historico: { titulo: string; tema?: string | null; layout?: string | null }[];
   // Resumo do Instagram do cliente (legendas e engajamento) e fotos de referência
   perfil?: string;
   fotosDoPerfil?: string[];
@@ -100,7 +100,7 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Sao_Paulo",
   });
   const historico = a.historico.length
-    ? a.historico.map((p) => `- ${p.titulo}${p.tema ? ` (${p.tema})` : ""}`).join("\n")
+    ? a.historico.map((p) => `- ${p.titulo}${p.tema ? ` (${p.tema})` : ""}${p.layout ? ` [layout: ${p.layout}]` : ""}`).join("\n")
     : "(nenhum post ainda: esta é a primeira semana da conta, então apresente a empresa)";
   const sistema =
     `Você é a social media criativa de uma agência brasileira que cuida do Instagram de pequenos negócios. ` +
@@ -117,7 +117,8 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `O INSTAGRAM ATUAL DA EMPRESA (aprenda a voz, os assuntos e o que o público mais curte; ` +
     `mantenha o que funciona, melhore o resto, não copie frases):\n${a.perfil ?? "(perfil não conectado)"}\n` +
     (a.fotosDoPerfil?.length ? `As imagens anexadas são fotos reais do perfil: use-as para entender o produto, o ambiente e o estilo visual da marca.\n` : "") +
-    `\nPOSTS JÁ CRIADOS PELO SCRULL (não repita estes assuntos):\n${historico}\n\n` +
+    `\nPOSTS JÁ CRIADOS PELO SCRULL, do mais recente ao mais antigo (não repita estes assuntos; o primeiro post novo ` +
+    `não pode ter o mesmo layout nem o mesmo tipo de assunto do mais recente):\n${historico}\n\n` +
     `TAREFA: crie ${a.quantidade} posts de feed para os próximos dias. Cada post precisa parecer diferente do anterior, ` +
     `no assunto, no formato da arte e no jeito da legenda.\n\n` +
     `VARIEDADE OBRIGATÓRIA:\n` +
@@ -143,6 +144,11 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `tecnologia/educação = tons frios, gradientes, composição moderna e objetiva; ` +
     `serviços = confiança, autoridade, dica prática. ` +
     `Alterne também o TIPO do post: lançamento, dica ou tutorial, bastidores, data especial, frase de engajamento, pergunta ao público e prova real.\n` +
+    `- DIREÇÃO DE ARTE: o padrão de qualidade é o de uma agência para todos, mas a identidade é exclusiva desta empresa: ` +
+    `uma confecção, uma pizzaria, um mercado e uma clínica precisam parecer marcas completamente diferentes. ` +
+    `Menos é mais: título curto, poucos elementos, nada de excesso de texto, brilho ou ícones. ` +
+    `Nunca dois posts seguidos com a mesma composição: mude o tipo de foto (produto, ambiente, detalhe, pessoas de costas ou mãos, vista de cima), ` +
+    `o ângulo, a luz e o cenário em cada "prompt_imagem". Se o cliente tiver fotos reais, o produto deve ser fiel a elas, sem inventar características.\n` +
     `- Legendas: varie o tamanho (algumas de 1 ou 2 linhas, outras com 3 ou 4 parágrafos curtos), o começo ` +
     `(nem sempre pergunta, nem sempre "Você sabia"), o final (convite, pergunta, frase de efeito, chamada para o direct) ` +
     `e o uso de emoji conforme o tom e o que o perfil já usa.\n\n` +

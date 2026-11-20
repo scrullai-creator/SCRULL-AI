@@ -79,7 +79,7 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
   const [{ data: plano }, { data: cfg }, { data: recentes }] = await Promise.all([
     db.from("planos").select("posts_por_semana").eq("id", cliente.plano_id).single(),
     db.from("configuracoes").select("postar_sem_aprovacao").eq("cliente_id", userId).single(),
-    db.from("posts").select("titulo_arte, tema").eq("cliente_id", userId)
+    db.from("posts").select("titulo_arte, tema, layout").eq("cliente_id", userId)
       .neq("status", "recusado").order("criado_em", { ascending: false }).limit(20),
   ]);
   const qtd = plano?.posts_por_semana ?? 7;
@@ -90,7 +90,7 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
     perfil: resumoDoPerfil(perfil), fotosDoPerfil,
     empresa: cliente.nome_empresa, ramo: cliente.ramo, tom: cliente.tom_de_voz, quantidade: qtd,
     briefing: lerBriefing(cliente.briefing), temLogo: !!cliente.logo_url,
-    historico: (recentes ?? []).map((p) => ({ titulo: p.titulo_arte ?? "", tema: p.tema })),
+    historico: (recentes ?? []).map((p) => ({ titulo: p.titulo_arte ?? "", tema: p.tema, layout: p.layout })),
   });
   const passo = qtd >= 7 ? 1 : 2;
   const status = cfg?.postar_sem_aprovacao ? "aprovado" : "aguardando_aprovacao";
