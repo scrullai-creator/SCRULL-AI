@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseNavegador } from "@/lib/supabase-browser";
 import { Cena } from "./cena";
+import { createClient } from "@supabase/supabase-js";
 
 export default function Login() {
   const router = useRouter();
@@ -28,12 +29,14 @@ export default function Login() {
     e.preventDefault();
     setErro(""); setMsg(""); setCarregando(true);
     try {
-      const { error } = await supabaseNavegador().auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/nova-senha`,
-      });
+      // Link que funciona em qualquer aparelho e navegador (não depende de onde o pedido foi feito):
+      // ele leva direto para /nova-senha, que lê a sessão que vem no próprio link
+      const avulso = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+      const { error } = await avulso.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/nova-senha` });
       if (error && /rate|limit|seconds/i.test(error.message)) return setErro("Muitos pedidos seguidos. Espere um minuto e tente de novo.");
       // Mesmo se o e-mail não tiver conta, a resposta é a mesma (não revela quem é cliente)
-      setMsg("Se esse e-mail tiver conta no Scrull, chega em instantes um link para criar uma senha nova. Abra o link neste mesmo aparelho e navegador.");
+      setMsg("Se esse e-mail tiver conta no Scrull, chega em instantes um link para criar uma senha nova. Pode abrir em qualquer aparelho. Confira também a caixa de spam.");
     } finally { setCarregando(false); }
   }
 
