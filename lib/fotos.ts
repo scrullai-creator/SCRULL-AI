@@ -42,6 +42,11 @@ export async function prepararFoto(url: string): Promise<Buffer | null> {
   if (proporcao >= 0.62 && proporcao < 1.2) {
     return ajustar(original.resize(1024, 1024, { fit: "cover", position: "attention" })).jpeg({ quality: 90 }).toBuffer();
   }
+  // Foto deitada moderada (até ~16:9): recorte quadrado no CENTRO, onde o produto costuma ficar,
+  // preenchendo o quadro todo (sem moldura nem bordas esfumadas).
+  if (proporcao >= 1.2 && proporcao <= 1.8) {
+    return ajustar(original.resize(1024, 1024, { fit: "cover", position: "centre" })).jpeg({ quality: 90 }).toBuffer();
+  }
   // Foto deitada: mostra o produto INTEIRO, com respiro em volta (a grade do Instagram corta as laterais),
   // sobre um fundo liso da cor das bordas da foto e com as bordas se dissolvendo, sem emenda dura.
   const bordas = await original.clone().extract({ left: 0, top: 0, width: meta.width ?? 1, height: Math.max(1, Math.round((meta.height ?? 1) * 0.06)) })
