@@ -18,10 +18,6 @@ const SEM = " No food, no pizza, no robots, no readable text.";
 const tam = (t: string, grande: number, medio: number, pequeno: number) =>
   t.length > 30 ? pequeno : t.length > 18 ? medio : grande;
 
-const Marca = ({ cor, fonte = "Mono" }: { cor: string; fonte?: string }) => (
-  <div style={{ display: "flex", fontFamily: fonte, fontSize: 24, letterSpacing: 2, color: cor }}>SCRULL AI</div>
-);
-
 const Mascote = ({ src, tamanho, estilo }: { src: string | null; tamanho: number; estilo: React.CSSProperties }) =>
   src ? <img src={src} width={tamanho} height={tamanho} style={{ position: "absolute", ...estilo }} /> : null;
 
@@ -49,7 +45,7 @@ export const MODELOS: Modelo[] = [
     montar: (d) => (
       <div style={{ width: W, height: W, display: "flex", background: "#f4f0ff" }}>
         <div style={{ width: 560, height: W, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "80px 50px 70px 70px" }}>
-          <Marca cor="#7c3aed" />
+          <div style={{ display: "flex" }} />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", fontFamily: "Grotesk", fontSize: tam(d.titulo, 84, 70, 58), lineHeight: 1.04, letterSpacing: -2, color: "#2e1065" }}>{d.titulo}</div>
             {d.sub && <div style={{ display: "flex", fontFamily: "Outfit", fontWeight: 500, fontSize: 32, color: "#5b21b6", marginTop: 22 }}>{d.sub}</div>}
@@ -75,7 +71,6 @@ export const MODELOS: Modelo[] = [
     montar: (d) => (
       <div style={{ width: W, height: W, display: "flex", position: "relative", background: "#ffffff" }}>
         <img src={d.foto} width={470} height={470} style={{ position: "absolute", top: 70, right: 70, objectFit: "cover", borderRadius: 235, border: "10px solid #ede9fe" }} />
-        <div style={{ position: "absolute", top: 80, left: 80, display: "flex", fontFamily: "Mono", fontSize: 26, color: "#7c3aed" }}>{"> scrull.ai"}</div>
         <Mascote src={d.mascote} tamanho={110} estilo={{ top: 150, left: 70 }} />
         <div style={{ position: "absolute", left: 80, bottom: 90, width: 860, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", width: 220, height: 10, borderRadius: 5, backgroundImage: "linear-gradient(90deg, #7c3aed, #06b6d4)", marginBottom: 28 }} />
@@ -88,18 +83,17 @@ export const MODELOS: Modelo[] = [
   // 4) Neon escuro: foto inteira, título no alto à esquerda, borda neon
   {
     nome: "neon",
-    luz: " Deep dark purple and violet neon lighting, night mood, modern.",
+    luz: " Warm, inviting evening light with subtle violet accents, cozy and optimistic, clear colors.",
     montar: (d) => (
       <div style={{ width: W, height: W, display: "flex", position: "relative" }}>
         <img src={d.foto} width={W} height={W} style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }} />
-        <div style={{ position: "absolute", top: 0, left: 0, width: W, height: W, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(30,6,60,0.88) 0%, rgba(30,6,60,0.35) 55%, rgba(30,6,60,0.7) 100%)" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, width: W, height: W, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(30,6,60,0.72) 0%, rgba(30,6,60,0.28) 32%, rgba(30,6,60,0) 55%)" }} />
         <div style={{ position: "absolute", top: 0, left: 0, width: W, height: W, display: "flex", border: "6px solid #c084fc" }} />
         <div style={{ position: "absolute", top: 90, left: 80, width: 800, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", fontFamily: "Sora", fontSize: tam(d.titulo, 86, 72, 60), lineHeight: 1.05, letterSpacing: -1.5, color: "#ffffff", textShadow: "0 0 28px rgba(192,132,252,0.8)" }}>{d.titulo}</div>
           {d.sub && <div style={{ display: "flex", fontFamily: "Outfit", fontWeight: 500, fontSize: 34, color: "#e9d5ff", marginTop: 20 }}>{d.sub}</div>}
         </div>
-        <div style={{ position: "absolute", left: 80, bottom: 70, display: "flex" }}><Marca cor="#e9d5ff" /></div>
-        <Mascote src={d.mascote} tamanho={150} estilo={{ bottom: 40, right: 40 }} />
+        <Mascote src={d.mascote} tamanho={120} estilo={{ bottom: 40, right: 40 }} />
       </div>
     ),
   },
@@ -116,7 +110,6 @@ export const MODELOS: Modelo[] = [
           {d.sub && <div style={{ display: "flex", fontFamily: "Outfit", fontWeight: 500, fontSize: 32, color: "#fae8ff", marginTop: 20, justifyContent: "flex-end" }}>{d.sub}</div>}
           <div style={{ display: "flex", marginTop: 36, padding: "14px 26px", borderRadius: 40, background: "#ffffff", fontFamily: "Outfit", fontWeight: 800, fontSize: 26, color: "#86198f" }}>@scrull.ai</div>
         </div>
-        <Mascote src={d.mascote} tamanho={120} estilo={{ top: 40, left: 40 }} />
       </div>
     ),
   },
