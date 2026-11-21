@@ -279,7 +279,7 @@ export async function reescreverLegendaPost(f: FormData) {
           tema: post.tema ?? "", titulo: post.titulo_arte ?? "", legendaAtual: post.legenda ?? "",
         });
         console.log("[legenda] IA respondeu", novo.legenda.length, "caracteres");
-        const { error: errUp, data: upd } = await s.from("posts").update({ legenda: novo.legenda, hashtags: novo.hashtags }).eq("id", id).eq("cliente_id", user.id).select("id");
+        const { error: errUp, data: upd } = await supabaseAdmin().from("posts").update({ legenda: novo.legenda, hashtags: novo.hashtags }).eq("id", id).eq("cliente_id", user.id).select("id");
         console.log("[legenda] gravou:", upd?.length ?? 0, "linha(s)", errUp ? `erro: ${errUp.message}` : "");
         if (errUp || !upd?.length) throw new Error("Não consegui gravar a nova legenda");
         reescritas.set(id, { dia, n: (r && r.dia === dia ? r.n : 0) + 1 });
