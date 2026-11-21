@@ -21,6 +21,7 @@ export type PedidoArte = {
   referencias?: { bytes: Buffer; tipo: "produto" | "mascote" }[];
   reservarCantoLogo: boolean;  // deixa o canto inferior direito livre para a logo
   assinatura?: string;         // ex.: "@scrull.ai", escrito pequeno num canto
+  evitar?: string;             // o que o cliente NÃO quer (texto dele, em português): vale para a imagem e a revisão
 };
 
 function montarPrompt(p: PedidoArte, correcoes?: string) {
@@ -53,6 +54,7 @@ function montarPrompt(p: PedidoArte, correcoes?: string) {
     `no misspelled or invented letters. All icons, checkmarks, shapes and accents use the brand colors (never default blue).` +
     (p.assinatura ? ` Add the handle "${p.assinatura}" small and discreet in a corner.` : "") +
     (p.reservarCantoLogo ? ` Leave the bottom-right corner (about 16% of the width) clean and simple for the brand logo, which will be added later.` : "") +
+    (p.evitar ? `\nCLIENT RESTRICTION (written in Portuguese by the client, follow it strictly in the image): "${p.evitar}"` : "") +
     (correcoes ? `\nFIX THESE PROBLEMS FROM THE PREVIOUS VERSION: ${correcoes}` : "")
   );
 }
@@ -122,7 +124,8 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
             `o título estiver pequeno ou difícil de ler no celular; a foto estiver borrada, estranha ou sem mostrar um assunto claro; ` +
             `houver grande espaço vazio ou sem graça; o produto ou cena for genérico e sem apelo (objeto vazio, caixa lisa); ` +
             `a cena não tiver relação com a mensagem do título (quem olha a imagem não entende a ideia "${p.titulo}"); ` +
-            `houver um mascote só parado ou apontando, sem fazer a ação do post; ícones fora das cores da marca; parecer amador.\n` +
+            `houver um mascote só parado ou apontando, sem fazer a ação do post; ícones fora das cores da marca; parecer amador` +
+            (p.evitar ? `; a imagem mostrar algo que o cliente pediu para NÃO aparecer: "${p.evitar}"` : "") + `.\n` +
             `TRANSCREVA todo o texto escrito na imagem EXATAMENTE como está desenhado, letra por letra, com os acentos que aparecem ` +
             `(se estiver "jà" ou "prónta", escreva assim; NÃO corrija nada).\n` +
             `Responda SOMENTE JSON: {"texto_lido": ["cada bloco de texto, como aparece"], "nota": 0-10, "texto_ok": true|false, "problemas": "lista curta em inglês do que corrigir, vazia se nada"}` },
@@ -154,7 +157,7 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
 
 // Revisão só da FOTO (antes de o app escrever título e logo por cima), para as artes
 // montadas pelo modelo do app: nitidez, proporções, enquadramento e apelo.
-export async function revisarFoto(foto: Buffer, empresa: string, ramo: string, mensagem = ""): Promise<Revisao> {
+export async function revisarFoto(foto: Buffer, empresa: string, ramo: string, mensagem = "", evitar = ""): Promise<Revisao> {
   const jpg = await sharp(foto).resize(640, 640, { fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -171,7 +174,8 @@ export async function revisarFoto(foto: Buffer, empresa: string, ramo: string, m
             `Reprove se: estiver borrada ou sem nitidez; houver mãos, dedos, rostos ou objetos deformados ou com proporção errada; ` +
             `houver letras, números, logos ou marcas d'água; o assunto principal não estiver claro; o enquadramento estiver torto ou cortando o assunto de forma estranha; ` +
             `o produto ou a cena for genérico e sem apelo; não combinar com esse tipo de negócio; parecer artificial ou amador` +
-            (mensagem ? `; a foto não tiver nenhuma relação com a mensagem do post: "${mensagem}"` : "") + `.\n` +
+            (mensagem ? `; a foto não tiver nenhuma relação com a mensagem do post: "${mensagem}"` : "") +
+            (evitar ? `; a foto mostrar algo que o cliente pediu para NÃO aparecer: "${evitar}"` : "") + `.\n` +
             `Responda SOMENTE JSON: {"nota": 0-10, "problemas": "lista curta em inglês do que corrigir, vazia se nada"}` },
         ],
       }],

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { publicarPost, PostOcupado } from "@/lib/publicar";
 import { registrar } from "@/lib/historico";
+import { atualizarMetricas } from "@/lib/metricas";
 import { gerarArteDoPost } from "@/lib/imagem";
 
 export const maxDuration = 120;
@@ -109,7 +110,9 @@ async function rodar(req: NextRequest) {
       }
     }
   }
-  return NextResponse.json({ na_fila: fila?.length ?? 0, processados: resultado, arte_adiantada: adiantada });
+  // Engajamento dos posts já publicados (leitura rápida, sem custo de IA)
+  const metricas = Date.now() - inicioRodada < 100_000 ? await atualizarMetricas().catch(() => 0) : 0;
+  return NextResponse.json({ na_fila: fila?.length ?? 0, processados: resultado, arte_adiantada: adiantada, metricas_lidas: metricas });
 }
 
 export const GET = rodar;
