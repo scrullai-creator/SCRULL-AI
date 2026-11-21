@@ -87,7 +87,18 @@ async function chamarOpenAI(prompt: string, referencias: Buffer[]): Promise<Buff
   return Buffer.from(j.data[0].b64_json, "base64");
 }
 
-export type Revisao = { aprovada: boolean; nota: number; problemas: string };
+export type Revisao = { aprovada: boolean; nota: number; problemas: string; textoOk?: boolean };
+
+// A IA de imagem às vezes erra acentos e letras ("jà", "prónta"). Por isso o revisor transcreve
+// o texto da arte letra por letra, e o app compara com o texto certo, sem confiar só na opinião dele.
+const normalizar = (t: string) => t.toLowerCase().replace(/[“”"'.,!?:;…()\-–—]/g, " ").replace(/\s+/g, " ").trim();
+export function textoConfere(esperados: string[], lido: string[]): { ok: boolean; faltando: string[] } {
+  const tudo = normalizar(lido.join(" "));
+  const faltando = esperados.filter((e) => e && !tudo.includes(normalizar(e)));
+  return { ok: faltando.length === 0, faltando };
+}
+
+export class TextoErrado extends Error {}
 
 // O Claude olha a arte pronta como um diretor de arte exigente
 export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao> {
@@ -111,7 +122,9 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
             `o título estiver pequeno ou difícil de ler no celular; a foto estiver borrada, estranha ou sem mostrar um assunto claro; ` +
             `houver grande espaço vazio ou sem graça; o produto ou cena for genérico e sem apelo (objeto vazio, caixa lisa); ` +
             `houver um mascote só parado ou apontando, sem fazer a ação do post; ícones fora das cores da marca; parecer amador.\n` +
-            `Responda SOMENTE JSON: {"nota": 0-10, "texto_ok": true|false, "problemas": "lista curta em inglês do que corrigir, vazia se nada"}` },
+            `TRANSCREVA todo o texto escrito na imagem EXATAMENTE como está desenhado, letra por letra, com os acentos que aparecem ` +
+            `(se estiver "jà" ou "prónta", escreva assim; NÃO corrija nada).\n` +
+            `Responda SOMENTE JSON: {"texto_lido": ["cada bloco de texto, como aparece"], "nota": 0-10, "texto_ok": true|false, "problemas": "lista curta em inglês do que corrigir, vazia se nada"}` },
         ],
       }],
     }),
@@ -119,16 +132,22 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
   if (!res.ok) {
     const e = await res.json().catch(() => null);
     console.error("Revisão da arte: erro", res.status, e?.error?.message ?? "");
-    return { aprovada: true, nota: -1, problemas: "" }; // sem revisão, não trava o cliente
+    return { aprovada: false, nota: -1, problemas: "", textoOk: false }; // sem conferir o texto, usa o texto do app
   }
   const j = await res.json();
   const texto: string = (j.content ?? []).map((b: any) => b.text ?? "").join("");
   try {
     const r = JSON.parse(texto.slice(texto.indexOf("{"), texto.lastIndexOf("}") + 1));
     const nota = Number(r.nota) || 0;
-    return { aprovada: !!r.texto_ok && nota >= 7, nota, problemas: String(r.problemas ?? "").slice(0, 600) };
+    const lido: string[] = Array.isArray(r.texto_lido) ? r.texto_lido.map(String) : [];
+    const conf = textoConfere([p.titulo, p.subtitulo ?? "", ...(p.topicos ?? [])], lido);
+    const textoOk = !!r.texto_ok && conf.ok;
+    if (!conf.ok) console.log("Arte IA: texto diferente do esperado. Faltou:", conf.faltando.join(" | "), "Lido:", lido.join(" | "));
+    const problemas = [String(r.problemas ?? ""), conf.ok ? "" : `Text must read exactly: ${conf.faltando.map((t) => `"${t}"`).join(", ")}.`].filter(Boolean).join(" ");
+    return { aprovada: textoOk && nota >= 7, nota, problemas: problemas.slice(0, 600), textoOk };
   } catch {
-    return { aprovada: true, nota: -1, problemas: "" };
+    // Sem conseguir conferir o texto, não arrisca: a arte usa o texto escrito pelo app
+    return { aprovada: false, nota: -1, problemas: "", textoOk: false };
   }
 }
 
@@ -179,11 +198,14 @@ export async function criarArteCompleta(p: PedidoArte, tempoLimiteMs = 40_000): 
   let arte = await chamarOpenAI(montarPrompt(p), refs);
   let revisao = await revisarArte(arte, p);
   console.log("Arte IA revisão:", p.empresa, revisao.nota, revisao.aprovada ? "aprovada" : `reprovada: ${revisao.problemas}`);
+  // Texto errado (acento, letra trocada): não tenta de novo com a IA de imagem; o app escreve o texto
+  if (!revisao.textoOk) throw new TextoErrado(revisao.problemas || "texto da arte não confere");
   if (!revisao.aprovada && Date.now() - inicio < tempoLimiteMs - 28_000) {
     const nova = await chamarOpenAI(montarPrompt(p, revisao.problemas), refs);
     const rev2 = await revisarArte(nova, p);
     console.log("Arte IA revisão (2ª):", p.empresa, rev2.nota, rev2.aprovada ? "aprovada" : `reprovada: ${rev2.problemas}`);
-    if (rev2.aprovada || rev2.nota >= revisao.nota) { arte = nova; revisao = rev2; }
+    // A segunda só entra se o texto dela estiver certo
+    if (rev2.textoOk && (rev2.aprovada || rev2.nota >= revisao.nota)) { arte = nova; revisao = rev2; }
   }
   return { arte, revisao };
 }
