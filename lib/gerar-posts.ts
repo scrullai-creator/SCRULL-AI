@@ -23,6 +23,13 @@ export const GUIA_LEGENDA =
   `"e aí, bora?", "conta pra gente nos comentários" em todo post, frases de efeito vazias, três adjetivos seguidos, ` +
   `explicar a piada, repetir a mesma estrutura entre os posts.\n` +
   `- Emoji: no máximo 1 ou 2, só onde uma pessoa colocaria; nunca um no fim de cada parágrafo.\n` +
+  `- CENA CONCRETA: cada legenda precisa ter pelo menos um detalhe que dá para ver, provar, ouvir ou sentir ` +
+  `(a calda escorrendo no prato, a cliente que pediu o terceiro pedaço, o cheiro da loja às 7h, a moto saindo da oficina brilhando). ` +
+  `"Qualidade", "feito com carinho", "ingredientes selecionados" sozinhos não contam: mostre em vez de afirmar.\n` +
+  `- O BRIEFING É FONTE, NÃO TEXTO: nunca copie nem parafraseie frases do briefing. Use os fatos dele para criar situações; ` +
+  `pode imaginar cenas do dia a dia plausíveis, mas nunca invente fatos (preço, prêmio, número, depoimento, endereço).\n` +
+  `- UMA VOZ SÓ: escolha "eu" (a dona falando) ou "a gente" (o negócio) conforme o briefing e o perfil, e mantenha em todos os posts. ` +
+  `Nunca comece se apresentando ("Oi, somos a X", "Nós da X").\n` +
   `- Exemplo ruim (robô): "Quantas vezes você já disse 'hoje eu posto' e a noite chegou sem nenhum post? 😅 Acontece com quem tem um negócio ` +
   `para tocar. Se você se reconheceu, guarda essa frase e segue o dia. Essa parte a gente pode cuidar por você. 💜"\n` +
   `- Exemplo bom (gente): "Terça, 21h. Caixa fechado, criança no banho, e o post do dia ainda no 'depois eu faço'. ` +
@@ -152,6 +159,18 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `Menos é mais: título curto, poucos elementos, nada de excesso de texto, brilho ou ícones. ` +
     `Nunca dois posts seguidos com a mesma composição: mude o tipo de foto (produto, ambiente, detalhe, pessoas de costas ou mãos, vista de cima), ` +
     `o ângulo, a luz e o cenário em cada "prompt_imagem". Se o cliente tiver fotos reais, o produto deve ser fiel a elas, sem inventar características.\n` +
+    `- SEM REPETIÇÃO NA SEMANA: cada argumento, expressão ou detalhe do briefing aparece em no máximo 1 post do lote ` +
+    `(se um post falou de "feito por encomenda" ou de "tempo e temperatura", os outros falam de outra coisa). ` +
+    `Varie a chamada final: no máximo 2 posts com a mesma chamada (ex.: "chama no direct"); use também WhatsApp, marcar alguém, ` +
+    `comentar, salvar o post, perguntar a data do evento, e deixe 1 ou 2 posts sem chamada nenhuma.\n` +
+    `- TOM DE VOZ DE VERDADE ("${a.tom}"): ` +
+    (/divert|descontra/i.test(a.tom) ? `pelo menos metade dos posts precisa ter humor ou leveza (situação do dia a dia que todo mundo reconhece, exagero leve, ironia carinhosa), sem piada forçada. ` :
+     /eleg|sofistic/i.test(a.tom) ? `frases mais curtas e escolhidas, vocabulário refinado, sem gíria nem exagero; sofisticação pelo detalhe, não por adjetivo. ` :
+     /direto|profiss/i.test(a.tom) ? `vá direto ao ponto, com informação útil e segura; sem floreio e sem gíria. ` :
+     `calor humano, como quem conversa com um cliente conhecido; perto, simples e gentil. `) +
+    `\n` +
+    `- TESTE FINAL: leia todas as legendas em sequência, como um seguidor que vê uma por dia. Se duas parecerem iguais na ideia, ` +
+    `na estrutura ou na chamada, reescreva uma delas.\n` +
     `- Legendas: varie o tamanho (algumas de 1 ou 2 linhas, outras com 3 ou 4 parágrafos curtos), o começo ` +
     `(nem sempre pergunta, nem sempre "Você sabia"), o final (convite, pergunta, frase de efeito, chamada para o direct) ` +
     `e o uso de emoji conforme o tom e o que o perfil já usa.\n\n` +
@@ -194,9 +213,10 @@ export async function criarPosts(a: DadosParaGerar): Promise<PostGerado[]> {
       },
       body: JSON.stringify({
         model: MODELO,
-        // Modelos novos (Sonnet/Haiku 5.5) recusam temperature; "effort" baixo deixa a resposta rápida
+        // Modelos novos (Sonnet/Haiku 5.5) recusam temperature. "effort" médio: pensa um pouco mais nas legendas
+        // (menos repetição, mais cena concreta); custa alguns centavos a mais por semana de posts
         max_tokens: 16000,
-        output_config: { effort: "low" },
+        output_config: { effort: "medium" },
         system: sistema,
         messages: [{ role: "user", content }],
       }),
