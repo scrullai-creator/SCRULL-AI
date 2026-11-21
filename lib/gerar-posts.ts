@@ -155,8 +155,13 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `Para cada post, devolva um objeto com:\n` +
     `- "tema": 2 a 4 palavras resumindo o assunto\n` +
     `- "layout": um de "faixa", "centro", "cartao", "frase"\n` +
-    `- "titulo": o texto grande da arte, até 7 palavras, com personalidade\n` +
-    `- "subtitulo": uma linha curta de apoio (até 10 palavras) para "centro" e "cartao"; vazio nos outros\n` +
+    `- "titulo": o texto grande da arte, até 7 palavras. PRECISA SER ENTENDIDO EM 2 SEGUNDOS por quem passa o dedo no feed ` +
+    `e nunca ouviu falar da empresa: diga direto o benefício, o produto ou a ideia. Proibido trocadilho, charada, frase de duplo sentido ` +
+    `ou frase que só faz sentido depois de ler a legenda (ruim: "Segunda começa no domingo"; bom: "Seus posts da semana prontos no domingo")\n` +
+    `- "subtitulo": uma linha curta de apoio (até 10 palavras) para "centro" e "cartao"; vazio nos outros. Completa o título com uma informação ` +
+    `concreta (como, para quem, o que ganha), nunca repete o título com outras palavras\n` +
+    `- TESTE ANTES DE RESPONDER: leia só o título e o subtítulo de cada post, sem a legenda. Se alguém de fora não entender o que está sendo dito ` +
+    `ou oferecido, reescreva de forma mais simples e direta. Personalidade vem do jeito de falar, não de enigma.\n` +
     `- "topicos": para "faixa", de 2 a 3 itens curtos (2 a 4 palavras); para os outros layouts, lista vazia\n` +
     `- "legenda": o texto do post, até 600 caracteres, sem hashtags dentro\n` +
     `- "hashtags": de 3 a 6 hashtags, misturando o nome da marca, o ramo, o assunto e a cidade se o briefing disser\n` +
