@@ -13,8 +13,8 @@ import { apagarFoto } from "./fotos";
 import { listarFotos, MAX_FOTOS } from "@/lib/fotos";
 import { aprovarTodos, alternarConfig, sair } from "./actions";
 
-// Gerar a arte pode levar até ~40 s
-export const maxDuration = 60;
+// Gerar a arte pode levar até ~60 s (arte da IA + plano B com o texto escrito pelo app)
+export const maxDuration = 120;
 
 const AVISOS: Record<string, [string, boolean]> = {
   ok: ["Instagram conectado! Já podemos criar seus posts.", true],

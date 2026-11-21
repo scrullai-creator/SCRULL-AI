@@ -7,7 +7,7 @@ import { publicarPost, PostOcupado } from "@/lib/publicar";
 import { registrar } from "@/lib/historico";
 import { gerarArteDoPost } from "@/lib/imagem";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 const POR_RODADA = 2;          // cada post leva até ~40 s (arte + publicação)
