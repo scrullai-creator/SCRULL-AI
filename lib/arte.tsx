@@ -37,7 +37,7 @@ function Check({ cor }: { cor: string }) {
   );
 }
 
-export type Layout = "faixa" | "centro" | "cartao" | "frase" | "foto";
+export type Layout = "faixa" | "centro" | "cartao" | "frase" | "foto" | "marca";
 
 export type DadosArte = {
   fundoJpeg: Buffer;          // foto gerada pela IA
@@ -104,7 +104,28 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
     arte = (
       <div style={{ width: W, height: W, display: "flex", position: "relative" }}>
         <img src={fundo} width={W} height={W} style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }} />
-        {logo && <div style={{ position: "absolute", right: 40, bottom: 40, display: "flex" }}>{marca}</div>}
+        {logo ? (
+          <div style={{ position: "absolute", right: 40, bottom: 40, display: "flex" }}>{marca}</div>
+        ) : (
+          // Marca d'água discreta com o nome do negócio, aplicada pelo app (nunca pedida à IA de imagem)
+          <div style={{ position: "absolute", right: 36, bottom: 30, display: "flex", fontFamily: "Jakarta", fontSize: 26, fontWeight: 800,
+            letterSpacing: 2, color: "rgba(255,255,255,0.88)", textShadow: "0 1px 8px rgba(0,0,0,0.55)" }}>{d.nomeEmpresa.toUpperCase()}</div>
+        )}
+      </div>
+    );
+  } else if (layout === "marca") {
+    // Arte gráfica da marca, sem foto: cor, título grande e nome/logo. Usada quando não há foto real do produto.
+    arte = (
+      <div style={{ width: W, height: W, display: "flex", position: "relative", fontFamily: "Jakarta", color: "#fff",
+        background: `linear-gradient(145deg, ${d.cor} 0%, ${d.cor}cc 100%)` }}>
+        <div style={{ position: "absolute", top: -160, right: -160, width: 520, height: 520, borderRadius: 520, background: "rgba(255,255,255,0.10)", display: "flex" }} />
+        <div style={{ position: "absolute", bottom: -200, left: -140, width: 480, height: 480, borderRadius: 480, background: "rgba(255,255,255,0.07)", display: "flex" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, width: W, height: W, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 110px" }}>
+          <div style={{ display: "flex", width: 96, height: 8, borderRadius: 8, background: "#fff", marginBottom: 40 }} />
+          <div style={{ display: "flex", fontSize: (tamTitulo + 4) * k, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5, ...tit }}>{titulo}</div>
+          {sub && <div style={{ display: "flex", fontSize: 34, fontWeight: 700, marginTop: 28, opacity: 0.9 }}>{sub}</div>}
+        </div>
+        <div style={{ position: "absolute", left: 110, bottom: 70, display: "flex" }}>{marca}</div>
       </div>
     );
   } else if (layout === "centro") {
