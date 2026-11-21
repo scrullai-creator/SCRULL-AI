@@ -15,6 +15,9 @@ export default function Login() {
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [codigoEnviado, setCodigoEnviado] = useState(false);
+  const [codigo, setCodigo] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
 
   // /login?aba=cadastro abre direto em "Criar conta" (link da página de vendas)
   useEffect(() => {
@@ -36,7 +39,27 @@ export default function Login() {
       const { error } = await avulso.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/nova-senha` });
       if (error && /rate|limit|seconds/i.test(error.message)) return setErro("Muitos pedidos seguidos. Espere um minuto e tente de novo.");
       // Mesmo se o e-mail não tiver conta, a resposta é a mesma (não revela quem é cliente)
-      setMsg("Se esse e-mail tiver conta no Scrull, chega em instantes um link para criar uma senha nova. Pode abrir em qualquer aparelho. Confira também a caixa de spam.");
+      setCodigoEnviado(true);
+      setMsg("Se esse e-mail tiver conta no Scrull, chega em instantes um código de 6 números. Confira também a caixa de spam.");
+    } finally { setCarregando(false); }
+  }
+
+  // Segundo passo: o código do e-mail + a senha nova, na mesma tela (funciona em qualquer aparelho)
+  async function trocarSenha(e: React.FormEvent) {
+    e.preventDefault();
+    setErro(""); setMsg("");
+    const cod = codigo.replace(/\D/g, "");
+    if (cod.length < 6) return setErro("Digite o código que chegou no seu e-mail.");
+    if (novaSenha.length < 8) return setErro("A senha nova precisa ter pelo menos 8 caracteres.");
+    setCarregando(true);
+    try {
+      const s = supabaseNavegador();
+      const { error } = await s.auth.verifyOtp({ email, token: cod, type: "recovery" });
+      if (error) return setErro(/expired|invalid/i.test(error.message) ? "Código errado ou vencido. Confira os números ou peça um código novo." : "Não foi possível confirmar o código. Tente de novo.");
+      const { error: e2 } = await s.auth.updateUser({ password: novaSenha });
+      if (e2) return setErro(/weak|password/i.test(e2.message) ? "Senha fraca. Misture letras e números." : "Não foi possível salvar a senha nova. Tente de novo.");
+      router.push("/painel");
+      router.refresh();
     } finally { setCarregando(false); }
   }
 
@@ -78,7 +101,7 @@ export default function Login() {
       router.push("/painel");
       router.refresh();
     } finally { setCarregando(false); }
-  }  const trocar = (a: typeof aba) => { setAba(a); setErro(""); setMsg(""); };
+  }  const trocar = (a: typeof aba) => { setAba(a); setErro(""); setMsg(""); setCodigoEnviado(false); setCodigo(""); setNovaSenha(""); };
 
   return (
     <>
@@ -125,6 +148,7 @@ export default function Login() {
         .sl-btn:disabled::before{content:'';display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-2px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:giro .7s linear infinite}
         @keyframes giro{to{transform:rotate(360deg)}}
         .sl-voltar{text-align:center}
+        .sl-codigo{text-align:center;font-size:24px!important;letter-spacing:10px;font-weight:700!important}
         .sl-sub{font-size:14px;color:#5b4b85;line-height:1.5}
         .sl-trust{display:flex;align-items:center;justify-content:center;gap:18px;padding-top:14px;border-top:1px solid #efe9fb}
         .sl-trust-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#7a6b9e}
@@ -188,15 +212,35 @@ export default function Login() {
               </form>
             )}
 
-            {aba === "esqueci" && (
+            {aba === "esqueci" && !codigoEnviado && (
               <form className="sl-fields" onSubmit={recuperar}>
-                <p className="sl-sub">Digite o e-mail da sua conta. Vamos mandar um link para você criar uma senha nova.</p>
+                <p className="sl-sub">Digite o e-mail da sua conta. Vamos mandar um código de 6 números para você criar uma senha nova.</p>
                 <div className="sl-field">
                   <label htmlFor="r-email">E-mail</label>
                   <input id="r-email" type="email" placeholder="voce@exemplo.com" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
                 </div>
-                <button type="submit" className="sl-btn" disabled={carregando}>{carregando ? "Enviando…" : "Enviar link"}</button>
+                <button type="submit" className="sl-btn" disabled={carregando}>{carregando ? "Enviando…" : "Enviar código"}</button>
                 <div className="sl-voltar"><button type="button" className="sl-link" onClick={() => trocar("login")}>Voltar para entrar</button></div>
+              </form>
+            )}
+
+            {aba === "esqueci" && codigoEnviado && (
+              <form className="sl-fields" onSubmit={trocarSenha}>
+                <p className="sl-sub">Enviamos o código para <b>{email}</b>.</p>
+                <div className="sl-field">
+                  <label htmlFor="r-cod">Código do e-mail</label>
+                  <input id="r-cod" className="sl-codigo" inputMode="numeric" autoComplete="one-time-code" placeholder="000000" maxLength={10}
+                    value={codigo} onChange={e => setCodigo(e.target.value.replace(/\D/g, ""))} required />
+                </div>
+                <div className="sl-field">
+                  <label htmlFor="r-nova">Senha nova</label>
+                  <div className="sl-senha"><input id="r-nova" type={ver ? "text" : "password"} placeholder="Mínimo 8 caracteres" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} required minLength={8} autoComplete="new-password" /><button type="button" className="sl-olho" onClick={() => setVer(v => !v)} aria-pressed={ver}>{ver ? "Ocultar" : "Mostrar"}</button></div>
+                </div>
+                <button type="submit" className="sl-btn" disabled={carregando}>{carregando ? "Salvando…" : "Salvar senha e entrar"}</button>
+                <div className="sl-voltar" style={{ display: "flex", justifyContent: "space-between" }}>
+                  <button type="button" className="sl-link" onClick={() => { setCodigoEnviado(false); setMsg(""); setErro(""); }}>Pedir outro código</button>
+                  <button type="button" className="sl-link" onClick={() => trocar("login")}>Voltar para entrar</button>
+                </div>
               </form>
             )}
 
