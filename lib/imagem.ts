@@ -182,18 +182,25 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
     // fotos reais que ele enviou). Nada do Scrull e nada de outro cliente entra aqui.
     // Negócios em que o produto é o astro (comida, moda, beleza): a foto é o post, limpa, sem frase por cima
     const fotoLimpa = segmento === "comida" || segmento === "moda" || segmento === "beleza";
+    // Piloto "produto real": nestes clientes, sem foto real do produto o app NÃO inventa uma foto dele; usa arte gráfica da marca.
+    // Ligado por cliente em PRODUTO_REAL_CLIENTES (ids separados por vírgula, ou * para todos).
+    const lista = (process.env.PRODUTO_REAL_CLIENTES ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    const produtoReal = fotoLimpa && (lista.includes("*") || lista.includes(clienteId));
     let foto: Buffer;
     if (escolhida) {
       foto = escolhida;
       visual.origem = "foto-cliente";
+    } else if (produtoReal) {
+      foto = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#ffffff" } }).jpeg().toBuffer();
+      visual.origem = "arte-grafica";
     } else {
       const restricao = briefing.evitar ? ` CLIENT RESTRICTION (in Portuguese, follow strictly): "${briefing.evitar}".` : "";
       foto = await fotoRevisada(cena + " " + direcao.textoEnquadramento + restricao, cliente?.nome_empresa ?? "", cliente?.ramo ?? "", memoria, inicio, visual,
         [titulo, post.subtitulo].filter(Boolean).join(" — "), briefing.evitar ?? "", fotoLimpa);
       visual.origem = "modelo";
     }
-    visual.hash ??= await impressaoDigital(foto);
-    const layoutFinal = fotoLimpa ? "foto" as const : escolherLayout(post.layout, gancho, usadas);
+    if (visual.origem !== "arte-grafica") visual.hash ??= await impressaoDigital(foto);
+    const layoutFinal = visual.origem === "arte-grafica" ? "marca" as const : fotoLimpa ? "foto" as const : escolherLayout(post.layout, gancho, usadas);
     visual.layout = layoutFinal;
     bytes = await montarArte({
       fundoJpeg: foto, titulo, topicos: post.topicos ?? [],

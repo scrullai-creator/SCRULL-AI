@@ -117,7 +117,7 @@ export type Visual = {
   estilo?: number;        // índice no manual do segmento
   enquadramento?: number; // índice em ENQUADRAMENTOS
   layout?: string | null;
-  origem?: "ia-completa" | "modelo" | "foto-cliente";
+  origem?: "ia-completa" | "modelo" | "foto-cliente" | "arte-grafica";
   nota?: number;          // nota da revisão de qualidade (0 a 10; -1 = sem revisão)
   hash?: string;          // impressão digital da imagem (64 bits em hexadecimal)
 };
