@@ -4,7 +4,7 @@ import { VerPost } from "./ver-post";
 import { Botao } from "./botao";
 import { PublicarAgora } from "./publicar-agora";
 import { aprovarPost, recusarPost, salvarLegenda, mudarHorario } from "./actions";
-import { gerarImagemPost, publicarAgora, reescreverLegendaPost, salvarTitulo } from "./gerar";
+import { gerarImagemPost, publicarAgora, reescreverLegendaPost, salvarTitulo, usarArteAnterior } from "./gerar";
 import { dataHora, type Situacao } from "@/lib/status-post";
 
 export type Historico = { post_id: string; acao: string; detalhe: string | null; quem: string | null; em: string };
@@ -21,7 +21,7 @@ const paraCampo = (iso: string) =>
 
 export function CartaoPost(p: {
   post: any; sit: Situacao; perfil?: string; assinante: boolean; temConta: boolean; facebook: boolean;
-  artes: InfoArtes; historico: Historico[]; vista: string;
+  artes: InfoArtes; historico: Historico[]; vista: string; versoes?: { url: string; em: string }[];
 }) {
   const { post, sit, artes } = p;
   const id = post.id as string;
@@ -144,6 +144,30 @@ export function CartaoPost(p: {
               </form>
             </details>
           </>
+        )}
+
+        {(p.versoes?.length ?? 0) > 1 && (
+          <details className="mini">
+            <summary>Artes deste post ({p.versoes!.length})</summary>
+            <small className="dica">Todas as artes já criadas ficam guardadas. Volte para outra sem gastar troca, ou baixe.</small>
+            <div className="acoes" style={{ marginTop: 8, alignItems: "flex-start" }}>
+              {p.versoes!.map((v, i) => {
+                const emUso = v.url === post.imagem_url;
+                return (
+                  <div key={v.url} style={{ width: 120, textAlign: "center" }}>
+                    <img src={v.url} alt={`Arte ${i + 1}`} width={120} height={120} loading="lazy"
+                      style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 10, border: emUso ? "3px solid #6d28d9" : "1px solid #ddd" }} />
+                    <small className="dica" style={{ display: "block" }}>{emUso ? "Em uso" : `Arte ${i + 1}`}</small>
+                    {!emUso && editavel && (
+                      <form action={usarArteAnterior}><Oculto /><input type="hidden" name="url" value={v.url} />
+                        <Botao className="btn sm ghost">Usar esta</Botao></form>
+                    )}
+                    <a className="btn sm ghost" href={`${v.url}?download=arte-${i + 1}.jpg`} style={{ display: "inline-block", marginTop: 4 }}>Baixar</a>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
         )}
 
         {!!p.historico.length && (

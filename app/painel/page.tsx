@@ -29,6 +29,7 @@ const AVISOS: Record<string, [string, boolean]> = {
   "aprov-ok": ["Aprovado! O post está agendado e sai sozinho na data marcada.", true],
   "aprov-todos": ["Posts aprovados e agendados.", true],
   "leg-salva": ["Legenda salva.", true],
+  "arte-voltou": ["Pronto: o post voltou a usar a arte escolhida.", true],
   "tit-ok": ["Título salvo. Ele entra na arte quando ela for criada.", true],
   "tit-ok-arte": ["Título salvo e arte refeita com o texto novo.", true],
   "tit-ok-limite": ["Título salvo, mas este post não tem mais trocas de arte. O texto novo entra se uma nova arte for criada.", false],
@@ -114,7 +115,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
     ? await supabase.from("contas_instagram").select("fb_page_id, fb_page_nome").eq("id", conta.id).maybeSingle()
     : { data: null };
   const paginaFb = fb?.fb_page_id ? (fb.fb_page_nome || "sua Página") : null;
-  const semArtes = { porPost: {} as Record<string, number>, noMes: 0, proximaVaga: null as string | null };
+  const semArtes = { porPost: {} as Record<string, number>, noMes: 0, proximaVaga: null as string | null, lista: {} as Record<string, { url: string; em: string }[]> };
   const artes = posts?.length ? await contarArtes(user.id).catch(() => semArtes) : semArtes;
   const aviso = ig ? AVISOS[ig] : undefined;
   const briefing = lerBriefing(cliente?.briefing);
@@ -385,7 +386,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
           <div className="card"><p style={{ margin: 0 }} className="sub">Nenhuma publicação {calendario ? "neste dia" : "com este filtro"}.</p></div>
         ) : (
           mostrados.map(({ p, sit }) => (
-            <CartaoPost key={p.id} post={p} sit={sit} perfil={conta?.ig_username ?? undefined} assinante={assinante} temConta={!!conta}
+            <CartaoPost key={p.id} versoes={artes.lista[p.id] ?? []} post={p} sit={sit} perfil={conta?.ig_username ?? undefined} assinante={assinante} temConta={!!conta}
               facebook={!!paginaFb && (cfg?.publicar_facebook ?? true)} vista={vista}
               historico={((hist ?? []) as Historico[]).filter((h) => h.post_id === p.id)}
               artes={{ usadasNoPost: artes.porPost[p.id] ?? 0, porPost: ARTES_POR_POST, noMes: artes.noMes, limiteMes,
