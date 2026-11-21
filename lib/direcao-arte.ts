@@ -74,6 +74,10 @@ const ESTILOS: Record<Segmento, string[]> = {
     "Bold typographic post with a single strong headline over a vivid brand-color background and a small supporting photo.",
   ],
   tecnologia: [
+    // 0 = estilo da casa do Scrull (o robô em ação). Volta com frequência: ver ESTILO_DA_CASA
+    "Vibrant 3D advertising scene: the friendly purple Scrull robot mascot in the foreground holding a smartphone, actively posting, with heart and like notification bubbles popping out of the screen; " +
+      "a beautiful, appetizing or desirable product display of a real small business (bakery counter, boutique rack, salon shelf, workshop) next to it, glowing; " +
+      "electric violet-to-blue gradient background with a soft neon frame and depth of field; huge bold white headline at the top with the subtitle right below, handle small in a bottom corner.",
     "Bright and modern: a smartphone in a hand showing a colorful, generic social feed (no readable text), clean light background with soft gradients; huge bold headline at the top.",
     "Vivid electric gradient background (blue to cyan or violet to magenta) with a 3D-style floating phone and abstract shapes; massive headline centered, tech-startup ad style.",
     "Real small-business owner's workspace (shop counter, salon, workshop) in bright daylight with a phone on the counter; headline large on a solid color block.",
@@ -142,10 +146,22 @@ function menosUsado(total: number, recentes: (number | undefined)[], gancho: num
 }
 
 // Direção de arte da próxima peça, levando em conta a memória visual do cliente
-export function escolherDirecao(segmento: Segmento, recentes: Visual[], gancho: number, trocas: number) {
+// Estilo da casa: um visual que a marca quer sempre por perto (no Scrull, o robô em ação com o celular).
+// Só vale para o próprio Scrull; para clientes do mesmo segmento esse estilo fica de fora.
+// Ele aparece pelo menos 1 vez a cada 3 posts, misturado aos outros estilos, nunca em dois posts seguidos.
+export const ESTILO_DA_CASA: Partial<Record<Segmento, number>> = { tecnologia: 0 };
+
+export function escolherDirecao(segmento: Segmento, recentes: Visual[], gancho: number, trocas: number, comEstiloDaCasa = false) {
   const lista = ESTILOS[segmento];
   const doSegmento = recentes.filter((v) => v.segmento === segmento);
-  const estilo = menosUsado(lista.length, doSegmento.map((v) => v.estilo), gancho, trocas);
+  const casa = comEstiloDaCasa ? ESTILO_DA_CASA[segmento] : undefined;
+  const ultimos = doSegmento.slice(0, 2).map((v) => v.estilo);
+  // O estilo da casa tem o mascote do Scrull: nunca aparece para clientes (cada cliente tem a própria identidade)
+  const proibido = comEstiloDaCasa ? undefined : ESTILO_DA_CASA[segmento];
+  const permitidos = lista.map((_, i) => i).filter((i) => i !== proibido);
+  const k = menosUsado(permitidos.length, doSegmento.map((v) => { const j = permitidos.indexOf(v.estilo ?? -1); return j < 0 ? undefined : j; }), gancho, trocas);
+  let estilo = permitidos[k];
+  if (casa !== undefined && doSegmento.length > 0 && !ultimos.includes(casa) && trocas === 0) estilo = casa;
   const enquadramento = menosUsado(ENQUADRAMENTOS.length, recentes.map((v) => v.enquadramento), gancho * 7, trocas);
   return { estilo, textoEstilo: lista[estilo], enquadramento, textoEnquadramento: ENQUADRAMENTOS[enquadramento] };
 }

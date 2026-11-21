@@ -200,15 +200,15 @@ export async function criarArteCompleta(p: PedidoArte, tempoLimiteMs = 40_000): 
   let arte = await chamarOpenAI(montarPrompt(p), refs);
   let revisao = await revisarArte(arte, p);
   console.log("Arte IA revisão:", p.empresa, revisao.nota, revisao.aprovada ? "aprovada" : `reprovada: ${revisao.problemas}`);
-  // Texto errado (acento, letra trocada): não tenta de novo com a IA de imagem; o app escreve o texto
-  if (!revisao.textoOk) throw new TextoErrado(revisao.problemas || "texto da arte não confere");
-  if (!revisao.aprovada && Date.now() - inicio < tempoLimiteMs - 28_000) {
+  if (!revisao.aprovada && Date.now() - inicio < tempoLimiteMs - 35_000) {
     const nova = await chamarOpenAI(montarPrompt(p, revisao.problemas), refs);
     const rev2 = await revisarArte(nova, p);
     console.log("Arte IA revisão (2ª):", p.empresa, rev2.nota, rev2.aprovada ? "aprovada" : `reprovada: ${rev2.problemas}`);
     // A segunda só entra se o texto dela estiver certo
-    if (rev2.textoOk && (rev2.aprovada || rev2.nota >= revisao.nota)) { arte = nova; revisao = rev2; }
+    if (rev2.textoOk && (rev2.aprovada || !revisao.textoOk || rev2.nota >= revisao.nota)) { arte = nova; revisao = rev2; }
   }
+  // Texto ainda errado (acento, letra trocada) depois da nova tentativa: o app escreve o texto, que sai sempre certo
+  if (!revisao.textoOk) throw new TextoErrado(revisao.problemas || "texto da arte não confere");
   return { arte, revisao };
 }
 

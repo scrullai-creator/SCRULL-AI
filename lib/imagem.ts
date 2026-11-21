@@ -127,7 +127,7 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   // Memória visual DESTE cliente: a próxima arte evita o estilo, o ângulo e a composição usados por último
   const memoria = await lerMemoria(clienteId, postId);
   const segmento = ehScrull ? "tecnologia" : segmentoDoRamo(cliente?.ramo ?? "");
-  const direcao = escolherDirecao(segmento, memoria, gancho, usadas);
+  const direcao = escolherDirecao(segmento, memoria, gancho, usadas, ehScrull);
   const visual: Visual = { segmento, estilo: direcao.estilo, enquadramento: direcao.enquadramento, layout: post.layout };
 
   // Arte completa pela IA (foto + texto + composição numa peça só, revisada pelo Claude).
@@ -149,7 +149,7 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
         ],
         reservarCantoLogo: !!logo,
         assinatura: ehScrull ? "@scrull.ai" : undefined,
-      }, 45_000);
+      }, 80_000);
       pronta = await aplicarLogo(arte, logo);
       visual.origem = "ia-completa";
       visual.nota = revisao.nota;
