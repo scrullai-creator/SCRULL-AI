@@ -4,7 +4,7 @@
 import { supabaseAdmin } from "./supabase";
 import { montarArte, corDaMarca, fonteDoRamo } from "./arte";
 import { montarArteScrull, modeloScrull, LUZ_SEM } from "./arte-scrull";
-import { criarArteCompleta, aplicarLogo, revisarFoto, mesmoProduto } from "./arte-ia";
+import { criarArteCompleta, aplicarLogo, revisarFoto, revisarRestricoes } from "./arte-ia";
 import { segmentoDoRamo, escolherDirecao, impressaoDigital, parecidaDemais, type Visual } from "./direcao-arte";
 import sharp from "sharp";
 import { lerBriefing } from "./briefing";
@@ -52,34 +52,35 @@ export async function gerarFoto(cena: string, limpa = false): Promise<Buffer> {
   return Buffer.from(b64, "base64");
 }
 
-// Usa a foto REAL do cliente como base e pede à IA para melhorá-la (luz, fundo, superfície, clima de foto profissional)
-// sem trocar o produto. Se a IA falhar ou o produto mudar, quem chama usa a foto original tratada.
-export async function melhorarFoto(base: Buffer, produto: string, restricao = ""): Promise<Buffer> {
+// A IA CRIA uma foto nova para o post, usando as fotos reais do cliente como referência do produto e da marca
+// (não como molde para copiar). O post pode ou não mostrar o produto, conforme a cena pedida.
+export async function criarComReferencia(refs: Buffer[], cena: string, sobre: string, evitar = ""): Promise<Buffer> {
   const chave = process.env.OPENAI_API_KEY;
   if (!chave) throw new Error("OPENAI_API_KEY não configurada");
   const prompt =
-    `Edit this real product photo into a professional commercial food/product photograph. KEEP THE PRODUCT EXACTLY AS IT IS: same shape, same proportions, ` +
-    `same colors, same glaze/texture, same openings or holes, same quantity. Do not redraw, restyle or replace the product. ` +
-    `Only improve the photography: soft bright natural window daylight, clean light neutral surface (white, cream or light linen), simple uncluttered background, ` +
-    `product centered with comfortable breathing room on all sides, correct white balance, gentle realistic shadows, crisp focus, true-to-life colors, ` +
-    `natural imperfections kept, authentic camera photo look, not a render. Remove distracting dark or messy elements around it. ` +
-    `Square composition. ${produto ? `The product is: ${produto}. ` : ""}${restricao ? `Client restriction: ${restricao}. ` : ""}` +
-    `Absolutely no text, letters, numbers, logos or watermarks.`;
+    `Create a NEW, original professional photograph for an Instagram post of a small business. The reference image(s) show the brand's real product: ` +
+    `use them to understand how the product looks and the brand's feel (shape, colors, texture, glaze), but do NOT copy their composition, background or framing. ` +
+    `Scene to create: ${cena} ` +
+    `Show the product only if the scene calls for it; if it appears, it must clearly be the same kind of product as in the references. ` +
+    `${sobre ? `About the business: ${sobre} ` : ""}` +
+    `Style: authentic, real-life photo by a commercial photographer, natural window daylight, light and airy, true-to-life colors, natural imperfections, ` +
+    `varied and creative composition, not a render, not plastic, no HDR. ` +
+    `${evitar ? `CLIENT RESTRICTION (in Portuguese, follow strictly, never show this): "${evitar}". ` : ""}` +
+    `Absolutely no text, letters, numbers, logos or watermarks anywhere in the image.`;
   const form = new FormData();
   form.append("model", MODELO);
   form.append("prompt", prompt);
   form.append("size", "1024x1024");
   form.append("quality", QUALIDADE);
-  form.append("input_fidelity", "high");
   form.append("output_format", "jpeg");
   form.append("n", "1");
-  form.append("image", new Blob([new Uint8Array(base)], { type: "image/jpeg" }), "foto.jpg");
+  refs.slice(0, 3).forEach((r, i) => form.append("image[]", new Blob([new Uint8Array(r)], { type: "image/jpeg" }), `ref${i}.jpg`));
   const res = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { authorization: `Bearer ${chave}` }, body: form });
   if (!res.ok) await lerErro(res);
   const j = await res.json();
   const b64 = j.data?.[0]?.b64_json;
-  if (!b64) throw new Error("A edição de imagem não devolveu a foto");
-  if (j.usage) console.log("OpenAI edição uso:", JSON.stringify(j.usage));
+  if (!b64) throw new Error("A criação de imagem não devolveu a foto");
+  if (j.usage) console.log("OpenAI criação uso:", JSON.stringify(j.usage));
   return Buffer.from(b64, "base64");
 }
 
@@ -221,14 +222,23 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
     if (escolhida) {
       foto = escolhida;
       visual.origem = "foto-cliente";
-      // A IA parte da foto real e a melhora; só vale se o produto continuar idêntico (senão fica a foto original tratada)
-      try {
-        const melhor = await melhorarFoto(escolhida, briefing.sobre ?? cliente?.ramo ?? "", briefing.evitar ?? "");
-        const conf = await mesmoProduto(escolhida, melhor, briefing.sobre ?? cliente?.ramo ?? "");
-        if (conf.igual) { foto = melhor; visual.origem = "foto-melhorada"; }
-        else console.warn("[melhorar-foto] produto mudou, usando a original:", conf.motivo);
-      } catch (e: any) {
-        console.error("[melhorar-foto] falhou, usando a original:", e?.message);
+      // A IA cria uma foto nova a partir das fotos reais (referência). A revisão só barra o que o cliente pediu para NÃO aparecer,
+      // texto/logo/marca d'água e defeitos graves; se não passar em 2 tentativas, vale a foto real do cliente.
+      const refs = [escolhida];
+      for (let k = 1; k <= 2 && k < fotosDoCliente.length; k++) {
+        const extra = await prepararFoto(fotosDoCliente[(gancho + usadas + k) % fotosDoCliente.length].url).catch(() => null);
+        if (extra) refs.push(extra);
+      }
+      const cenaCriativa = cena + " " + direcao.textoEnquadramento;
+      for (let t = 0; t < 2; t++) {
+        try {
+          const nova = await criarComReferencia(refs, cenaCriativa, briefing.sobre ?? "", briefing.evitar ?? "");
+          const rev = await revisarRestricoes(nova, briefing.evitar ?? "");
+          if (rev.aprovada) { foto = nova; visual.origem = "ia-criativa"; break; }
+          console.warn("[criar-foto] reprovada:", rev.problemas);
+        } catch (e: any) {
+          console.error("[criar-foto] falhou:", e?.message);
+        }
       }
     } else if (produtoReal) {
       foto = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#ffffff" } }).jpeg().toBuffer();

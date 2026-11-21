@@ -232,32 +232,31 @@ export async function aplicarLogo(arte: Buffer, logo: { bytes: Buffer } | null):
 }
 
 
-// Compara a foto ORIGINAL do cliente com a versão melhorada pela IA: o produto tem que ser o mesmo
-// (forma, furo, cor, textura, quantidade). Se mudou, a versão melhorada é descartada.
-export async function mesmoProduto(original: Buffer, editada: Buffer, produto: string): Promise<{ igual: boolean; motivo: string }> {
-  const peq = (b: Buffer) => sharp(b).resize(640, 640, { fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
-  const [a, b] = await Promise.all([peq(original), peq(editada)]);
+// Revisão leve para fotos criadas a partir das fotos do cliente: barra SÓ o que o cliente pediu para não aparecer,
+// texto/logo/marca d'água e defeitos graves. Não exige que o produto seja idêntico nem julga estilo.
+export async function revisarRestricoes(foto: Buffer, evitar = ""): Promise<{ aprovada: boolean; problemas: string }> {
+  const jpg = await sharp(foto).resize(640, 640, { fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: MODELO_REVISAO, max_tokens: 1000, output_config: { effort: "low" },
+      model: MODELO_REVISAO, max_tokens: 800, output_config: { effort: "low" },
       messages: [{ role: "user", content: [
-        { type: "text", text: "Imagem 1: foto ORIGINAL do produto real." },
-        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: a.toString("base64") } },
-        { type: "text", text: "Imagem 2: versão melhorada pela IA." },
-        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b.toString("base64") } },
-        { type: "text", text: `O produto é: ${produto || "o produto da foto"}. O produto da imagem 2 é EXATAMENTE o mesmo da imagem 1 (mesma forma, furo/aberturas, cor, brilho, textura, tamanho, quantidade)? ` +
-          `Mudar o fundo, a luz e a superfície é permitido; mudar o produto não. Reprove também se houver texto, letras ou logos na imagem 2. ` +
-          `Responda SOMENTE JSON: {"igual": true|false, "motivo": "curto"}` },
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpg.toString("base64") } },
+        { type: "text", text:
+          `Foto para post de Instagram de um negócio. Reprove SOMENTE se: tiver texto, letras, números, logo ou marca d'água; ` +
+          `estiver muito borrada; tiver objetos ou mãos gravemente deformados` +
+          (evitar ? `; mostrar algo que o cliente pediu para NÃO aparecer: "${evitar}"` : "") + `. ` +
+          `Não reprove por estilo, composição, forma do produto ou por ser diferente de outras fotos. ` +
+          `Responda SOMENTE JSON: {"aprovada": true|false, "problemas": "curto"}` },
       ] }],
     }),
   }).catch(() => null);
-  if (!res?.ok) return { igual: false, motivo: "revisão indisponível" };
+  if (!res?.ok) return { aprovada: true, problemas: "" };
   const j = await res.json();
   const t: string = (j.content ?? []).map((x: any) => x.text ?? "").join("");
   try {
     const r = JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1));
-    return { igual: r.igual === true, motivo: String(r.motivo ?? "").slice(0, 300) };
-  } catch { return { igual: false, motivo: "resposta ilegível" }; }
+    return { aprovada: r.aprovada !== false, problemas: String(r.problemas ?? "").slice(0, 300) };
+  } catch { return { aprovada: true, problemas: "" }; }
 }
