@@ -113,17 +113,20 @@ export async function contarArtes(clienteId: string) {
   const umMesAtras = Date.now() - 30 * 86400000;
   const artes = (data ?? []).filter((f) => !f.name.startsWith("logo."));
   const porPost: Record<string, number> = {};
+  const lista: Record<string, { url: string; em: string }[]> = {};
   let noMes = 0;
   let maisAntiga: number | null = null; // a arte mais antiga dentro dos últimos 30 dias
   for (const f of artes) {
     const postId = f.name.replace(/-\d+\.jpg$/, "");
     porPost[postId] = (porPost[postId] ?? 0) + 1;
+    (lista[postId] ??= []).push({ url: db.storage.from(PASTA).getPublicUrl(`${clienteId}/${f.name}`).data.publicUrl, em: String(f.created_at ?? "") });
     const t = new Date(f.created_at ?? 0).getTime();
     if (t >= umMesAtras) { noMes++; if (maisAntiga === null || t < maisAntiga) maisAntiga = t; }
   }
   // O limite mensal conta os últimos 30 dias: a próxima vaga abre quando a arte mais antiga completa 30 dias
   const proximaVaga = maisAntiga !== null ? new Date(maisAntiga + 30 * 86400000).toISOString() : null;
-  return { porPost, noMes, proximaVaga };
+  for (const k of Object.keys(lista)) lista[k].sort((a, b) => a.em.localeCompare(b.em));
+  return { porPost, noMes, proximaVaga, lista };
 }
 
 // Gera a arte de um post e salva a URL nele

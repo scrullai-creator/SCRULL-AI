@@ -159,6 +159,28 @@ export async function gerarImagemPost(f: FormData) {
   redirect(destino(f, resultado, id));
 }
 
+// Volta a usar uma das artes já criadas do post (não gasta troca). A arte tem que ser deste cliente e deste post.
+export async function usarArteAnterior(f: FormData) {
+  const { s, user } = await usuarioLogado();
+  const id = String(f.get("id") ?? "");
+  const url = String(f.get("url") ?? "");
+  let resultado = "img-erro";
+  try {
+    const { data: post } = await s.from("posts").select("id, status").eq("id", id).eq("cliente_id", user.id).single();
+    const base = supabaseAdmin().storage.from("artes").getPublicUrl(`${user.id}/${id}-`).data.publicUrl;
+    if (post && post.status !== "publicado" && url.startsWith(base) && /^[^?#]+\.jpg$/.test(url) ) {
+      const { error } = await supabaseAdmin().from("posts").update({ imagem_url: url }).eq("id", id).eq("cliente_id", user.id);
+      if (error) throw error;
+      await registrar(id, user.id, "arte", "voltou para uma arte anterior");
+      resultado = "arte-voltou";
+    }
+  } catch (e) {
+    console.error("Erro ao voltar para arte anterior:", e);
+  }
+  revalidatePath("/painel");
+  redirect(destino(f, resultado, id));
+}
+
 // Volta para a mesma aba/visão do painel, com o aviso e no mesmo post
 function destino(f: FormData, aviso: string, id: string) {
   const vista = String(f.get("vista") ?? "");
