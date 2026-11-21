@@ -92,7 +92,10 @@ const SCRULL_INSTITUCIONAL =
   `A pizzaria é só a origem da história da fundadora: no máximo 1 post a cada várias semanas sobre isso, e NUNCA foto de pizza, comida ou restaurante. ` +
   `Tom leve e confiante, nunca radical (evite "odeio", "pavor", "desespero"). ` +
   `"prompt_imagem": uma cena concreta e atraente de um pequeno negócio real (doceria, loja de roupas, salão, oficina, ateliê, mercadinho...), ` +
-  `com um produto específico e bonito, e o mascote robô roxo do Scrull FAZENDO a ação do post (fotografando o produto com o celular, ` +
+  `com um produto específico e bonito E O RESULTADO QUE O POST PROMETE VISÍVEL NA CENA (um celular mostrando um feed com vários posts coloridos e organizados, ` +
+  `um calendário de posts agendados, notificações de curtidas e mensagens subindo, o dono tranquilo enquanto o celular publica). ` +
+  `Quem olha só a foto precisa entender a ideia do título; um produto sozinho, sem o Instagram/resultado na cena, não serve. ` +
+  `Luz clara e convidativa (nada de cena escura e triste), e o mascote robô roxo do Scrull FAZENDO a ação do post (fotografando o produto com o celular, ` +
   `agendando posts num tablet, arrumando a vitrine, comemorando curtidas); nunca objetos genéricos nem o robô parado; sem telas com texto legível. `;
 
 export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: string } {

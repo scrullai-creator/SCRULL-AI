@@ -4,7 +4,7 @@ import { VerPost } from "./ver-post";
 import { Botao } from "./botao";
 import { PublicarAgora } from "./publicar-agora";
 import { aprovarPost, recusarPost, salvarLegenda, mudarHorario } from "./actions";
-import { gerarImagemPost, publicarAgora, reescreverLegendaPost } from "./gerar";
+import { gerarImagemPost, publicarAgora, reescreverLegendaPost, salvarTitulo } from "./gerar";
 import { dataHora, type Situacao } from "@/lib/status-post";
 
 export type Historico = { post_id: string; acao: string; detalhe: string | null; quem: string | null; em: string };
@@ -12,7 +12,7 @@ export type InfoArtes = { usadasNoPost: number; porPost: number; noMes: number; 
 
 const ACOES: Record<string, string> = {
   criado: "Criado", aprovado: "Aprovado", recusado: "Recusado", arte: "Arte", legenda: "Legenda",
-  horario: "Data alterada", publicando: "Enviando ao Instagram", publicado: "Publicado", falhou: "Falhou",
+  horario: "Data alterada", titulo: "Título alterado", publicando: "Enviando ao Instagram", publicado: "Publicado", falhou: "Falhou",
 };
 
 // Valor do campo de data (AAAA-MM-DDTHH:MM) no horário de Brasília
@@ -111,6 +111,20 @@ export function CartaoPost(p: {
                     (restamNoMes <= 0 ? `; limite atingido${vaga ? `, a próxima vaga abre em ${vaga}` : ""}.` : ` (o mês conta os últimos 30 dias; cada arte libera a vaga 30 dias depois de criada).`)}
             </small>
 
+            <details className="mini">
+              <summary>Editar título da arte</summary>
+              <form action={salvarTitulo} style={{ marginTop: 8 }}>
+                <Oculto />
+                <label htmlFor={`tit-${id}`}>Título <small className="dica">curto e direto, até 60 letras</small></label>
+                <input id={`tit-${id}`} name="titulo" className="campo" defaultValue={post.titulo_arte ?? ""} maxLength={60} required />
+                <label htmlFor={`sub-${id}`}>Subtítulo <small className="dica">opcional, até 90 letras</small></label>
+                <input id={`sub-${id}`} name="subtitulo" className="campo" defaultValue={post.subtitulo ?? ""} maxLength={90} />
+                <Botao className="btn sm">{post.imagem_url && podeArte ? "Salvar e refazer a arte" : "Salvar título"}</Botao>
+              </form>
+              <small className="dica">{post.imagem_url
+                ? (podeArte ? "A arte é refeita com o texto novo (usa uma troca)." : "Sem trocas neste post: o texto fica salvo para a próxima arte.")
+                : "O texto entra na arte quando ela for criada."}</small>
+            </details>
             <details className="mini">
               <summary>Mudar data e horário</summary>
               <form action={mudarHorario} className="acoes" style={{ marginTop: 8 }}>

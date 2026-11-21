@@ -167,6 +167,40 @@ function destino(f: FormData, aviso: string, id: string) {
   return `/painel?${q}#post-${id}`;
 }
 
+// Editar o título (e o subtítulo) da arte. Se o post já tem arte e ainda há trocas, a arte é refeita
+// com o texto novo (conta como uma troca); sem trocas, o texto fica salvo para a próxima arte.
+export async function salvarTitulo(f: FormData) {
+  const { user } = await usuarioLogado();
+  const id = String(f.get("id") ?? "");
+  const titulo = String(f.get("titulo") ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
+  const subtitulo = String(f.get("subtitulo") ?? "").replace(/\s+/g, " ").trim().slice(0, 90);
+  let resultado = "tit-erro";
+  try {
+    if (!titulo) throw new Error("título vazio");
+    const db = supabaseAdmin();
+    const { data } = await db.from("posts").update({ titulo_arte: titulo, subtitulo: subtitulo || null })
+      .eq("id", id).eq("cliente_id", user.id).in("status", ["aguardando_aprovacao", "aprovado", "recusado", "erro"])
+      .select("id, imagem_url");
+    if (!data?.length) throw new Error("post não pode ser alterado");
+    await registrar(id, user.id, "titulo", `"${titulo}"`);
+    resultado = "tit-ok";
+    if (data[0].imagem_url) {
+      try {
+        await gerarArteDoPost(id, user.id);
+        await registrar(id, user.id, "arte", "refeita com o título novo");
+        resultado = "tit-ok-arte";
+      } catch (e) {
+        resultado = e instanceof LimiteDeArtes ? "tit-ok-limite" : "tit-ok-sem-arte";
+        if (!(e instanceof LimiteDeArtes)) console.error("Erro ao refazer a arte com o título novo:", e);
+      }
+    }
+  } catch (e) {
+    console.error("Erro ao salvar o título:", e);
+  }
+  revalidatePath("/painel");
+  redirect(destino(f, resultado, id));
+}
+
 // Publicar agora no Instagram (só assinantes) -------------------------------
 export async function publicarAgora(f: FormData) {
   const { user } = await usuarioLogado();

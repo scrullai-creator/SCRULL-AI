@@ -176,7 +176,8 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
       foto = escolhida;
       visual.origem = "foto-cliente";
     } else {
-      foto = await fotoRevisada(cena + " " + direcao.textoEnquadramento, cliente?.nome_empresa ?? "", cliente?.ramo ?? "", memoria, inicio, visual);
+      foto = await fotoRevisada(cena + " " + direcao.textoEnquadramento, cliente?.nome_empresa ?? "", cliente?.ramo ?? "", memoria, inicio, visual,
+        [titulo, post.subtitulo].filter(Boolean).join(" — "));
       visual.origem = "modelo";
     }
     visual.hash ??= await impressaoDigital(foto);
@@ -212,9 +213,9 @@ async function lerMemoria(clienteId: string, postId: string): Promise<Visual[]> 
 // Foto criada pela IA para o modelo do app: o Claude revisa (nitidez, proporção, enquadramento, apelo)
 // e a memória confere se não ficou parecida demais com uma arte recente. Se reprovar e ainda houver
 // tempo, refaz UMA vez com as correções (para não gastar o saldo) e fica com a melhor das duas.
-async function fotoRevisada(cena: string, empresa: string, ramo: string, memoria: Visual[], inicio: number, visual: Visual) {
+async function fotoRevisada(cena: string, empresa: string, ramo: string, memoria: Visual[], inicio: number, visual: Visual, mensagem = "") {
   const foto = await gerarFoto(cena);
-  const [rev, hash] = await Promise.all([revisarFoto(foto, empresa, ramo), impressaoDigital(foto)]);
+  const [rev, hash] = await Promise.all([revisarFoto(foto, empresa, ramo, mensagem), impressaoDigital(foto)]);
   const repetida = parecidaDemais(hash, memoria);
   console.log("Foto revisão:", empresa, rev.nota, rev.aprovada ? "aprovada" : `reprovada: ${rev.problemas}`, repetida ? "(parecida com arte recente)" : "");
   visual.nota = rev.nota; visual.hash = hash;
@@ -223,7 +224,7 @@ async function fotoRevisada(cena: string, empresa: string, ramo: string, memoria
   const correcoes = [rev.aprovada ? "" : rev.problemas,
     repetida ? "Too similar to a recent post: use a clearly different camera angle, setting and color mood." : ""].filter(Boolean).join(" ");
   const nova = await gerarFoto(`${cena} FIX THESE PROBLEMS: ${correcoes}`);
-  const [rev2, hash2] = await Promise.all([revisarFoto(nova, empresa, ramo), impressaoDigital(nova)]);
+  const [rev2, hash2] = await Promise.all([revisarFoto(nova, empresa, ramo, mensagem), impressaoDigital(nova)]);
   console.log("Foto revisão (2ª):", empresa, rev2.nota, rev2.aprovada ? "aprovada" : `reprovada: ${rev2.problemas}`);
   if (rev2.nota >= rev.nota || repetida) { visual.nota = rev2.nota; visual.hash = hash2; return nova; }
   return foto;
