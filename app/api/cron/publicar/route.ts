@@ -73,7 +73,43 @@ async function rodar(req: NextRequest) {
       resultado.push({ id: p.id, ok: false, motivo });
     }
   }
-  return NextResponse.json({ na_fila: fila?.length ?? 0, processados: resultado });
+  // Artes com antecedência: o cliente não precisa tocar em "Criar arte". Posts dos próximos 3 dias ainda sem arte,
+  // de assinantes ativos e sem pausa, ganham a arte aqui, uma por rodada (cada uma leva até ~90 s; são ~96 rodadas por dia).
+  // Um post cuja arte falhou nas últimas 6 horas fica de lado, para não gastar saldo tentando a mesma coisa sem parar.
+  let adiantada: string | null = null;
+  if (Date.now() - inicioRodada < 20_000) {
+    const { data: candidatos } = await db.from("posts")
+      .select("id, cliente_id, clientes!inner(assinatura)")
+      .in("status", ["aguardando_aprovacao", "aprovado"])
+      .is("imagem_url", null)
+      .eq("clientes.assinatura", "ativa")
+      .gt("agendado_para", agora.toISOString())
+      .lte("agendado_para", new Date(agora.getTime() + 3 * 86400000).toISOString())
+      .order("agendado_para").limit(8);
+    const idsC = (candidatos ?? []).map((p) => p.id);
+    const clientesC = [...new Set((candidatos ?? []).map((p) => p.cliente_id))];
+    const [{ data: falhas }, { data: cfgC }] = await Promise.all([
+      idsC.length ? db.from("post_historico").select("post_id").in("post_id", idsC).eq("acao", "arte_falhou")
+        .gte("em", new Date(agora.getTime() - 6 * 3600000).toISOString()) : Promise.resolve({ data: [] as { post_id: string }[] }),
+      clientesC.length ? db.from("configuracoes").select("cliente_id, pausado").in("cliente_id", clientesC)
+        : Promise.resolve({ data: [] as { cliente_id: string; pausado: boolean }[] }),
+    ]);
+    const falhou = new Set((falhas ?? []).map((f) => f.post_id));
+    const pausadoC = new Set((cfgC ?? []).filter((c) => c.pausado).map((c) => c.cliente_id));
+    const p = (candidatos ?? []).find((c) => !falhou.has(c.id) && !pausadoC.has(c.cliente_id));
+    if (p) {
+      try {
+        await gerarArteDoPost(p.id, p.cliente_id);
+        await registrar(p.id, p.cliente_id, "arte", "arte criada com antecedência", "automático");
+        adiantada = p.id;
+      } catch (e) {
+        const motivo = e instanceof Error ? e.message : "erro";
+        console.error("Arte com antecedência falhou:", p.id, motivo);
+        await registrar(p.id, p.cliente_id, "arte_falhou", motivo, "automático");
+      }
+    }
+  }
+  return NextResponse.json({ na_fila: fila?.length ?? 0, processados: resultado, arte_adiantada: adiantada });
 }
 
 export const GET = rodar;
