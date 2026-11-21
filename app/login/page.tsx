@@ -89,11 +89,11 @@ export default function Login() {
         .cadente{stroke-dasharray:120;stroke-dashoffset:120;animation:cadente 7s ease-in 2s infinite}
         @keyframes cadente{0%{stroke-dashoffset:120;opacity:0}4%{opacity:.9}10%{stroke-dashoffset:-120;opacity:0}100%{stroke-dashoffset:-120;opacity:0}}
         .sl-card{position:relative;z-index:1;width:100%;max-width:410px;background:#fff;border-radius:26px;overflow:hidden;box-shadow:0 30px 80px rgba(20,8,60,.55),0 0 0 1px rgba(255,255,255,.15)}
-        .sl-topo{position:relative;height:190px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+        .sl-topo{position:relative;height:190px;display:flex;align-items:flex-end;justify-content:center}
         .sl-topo svg{position:absolute;inset:0;width:100%;height:100%}
-        .sl-mascote{position:relative;width:118px;height:auto;margin-bottom:-26px;filter:drop-shadow(0 10px 16px rgba(36,10,90,.45)) drop-shadow(0 0 18px rgba(217,70,239,.35));animation:flut 4s ease-in-out infinite}
+        .sl-mascote{position:relative;z-index:2;width:148px;height:auto;margin-bottom:-38px;filter:drop-shadow(0 10px 16px rgba(36,10,90,.45)) drop-shadow(0 0 18px rgba(217,70,239,.35));animation:flut 4s ease-in-out infinite}
         @keyframes flut{50%{transform:translateY(-5px)}}
-        .sl-corpo{padding:40px 32px 26px;display:flex;flex-direction:column;gap:18px}
+        .sl-corpo{padding:48px 32px 26px;display:flex;flex-direction:column;gap:18px}
         .sl-brand{text-align:center}
         .sl-name{font-family:'Syne',system-ui,sans-serif;font-size:25px;font-weight:800;letter-spacing:-.4px;line-height:1;color:#24124d}
         .sl-name span{color:#7c3aed}
@@ -135,7 +135,7 @@ export default function Login() {
         <div className="sl-card">
           <div className="sl-topo">
             <Cena id="topo" />
-            <img className="sl-mascote" src="/mascote-solto.png" alt="Mascote do Scrull AI" width={118} height={128} />
+            <img className="sl-mascote" src="/mascote-solto.png" alt="Mascote do Scrull AI" width={148} height={160} />
           </div>
           <div className="sl-corpo">
             <div className="sl-brand">
