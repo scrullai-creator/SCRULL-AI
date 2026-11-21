@@ -93,7 +93,7 @@ export default function Login() {
         .sl-topo svg{position:absolute;inset:0;width:100%;height:100%}
         .sl-mascote{position:relative;z-index:2;width:148px;height:auto;margin-bottom:-38px;filter:drop-shadow(0 10px 16px rgba(36,10,90,.45)) drop-shadow(0 0 18px rgba(217,70,239,.35));animation:flut 4s ease-in-out infinite}
         @keyframes flut{50%{transform:translateY(-5px)}}
-        .sl-corpo{padding:48px 32px 26px;display:flex;flex-direction:column;gap:18px}
+        .sl-corpo{padding:60px 32px 26px;display:flex;flex-direction:column;gap:18px}
         .sl-brand{text-align:center}
         .sl-name{font-family:'Syne',system-ui,sans-serif;font-size:25px;font-weight:800;letter-spacing:-.4px;line-height:1;color:#24124d}
         .sl-name span{color:#7c3aed}
@@ -127,7 +127,7 @@ export default function Login() {
         .sl-trust-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#7a6b9e}
         .sl-dot{width:6px;height:6px;border-radius:50%;background:#a855f7}
         button:focus-visible,input:focus-visible{outline:3px solid #ffd21f;outline-offset:2px}
-        @media(max-width:460px){.sl-corpo{padding:42px 22px 22px}.sl-topo{height:160px}.sl-trust{gap:12px}}
+        @media(max-width:460px){.sl-corpo{padding:56px 22px 22px}.sl-topo{height:160px}.sl-trust{gap:12px}}
         @media(prefers-reduced-motion:reduce){.estrela,.cadente,.sl-mascote{animation:none}}
       `}</style>
       <div className="sl-root">
