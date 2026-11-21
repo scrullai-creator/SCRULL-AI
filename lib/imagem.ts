@@ -4,7 +4,7 @@
 import { supabaseAdmin } from "./supabase";
 import { montarArte, corDaMarca, fonteDoRamo } from "./arte";
 import { montarArteScrull, modeloScrull, LUZ_SEM } from "./arte-scrull";
-import { criarArteCompleta, aplicarLogo, revisarFoto } from "./arte-ia";
+import { criarArteCompleta, aplicarLogo, revisarFoto, mesmoProduto } from "./arte-ia";
 import { segmentoDoRamo, escolherDirecao, impressaoDigital, parecidaDemais, type Visual } from "./direcao-arte";
 import sharp from "sharp";
 import { lerBriefing } from "./briefing";
@@ -49,6 +49,37 @@ export async function gerarFoto(cena: string, limpa = false): Promise<Buffer> {
   const b64 = j.data?.[0]?.b64_json;
   if (!b64) throw new Error("A geração de imagem não devolveu a foto");
   if (j.usage) console.log("OpenAI imagens uso:", JSON.stringify(j.usage));
+  return Buffer.from(b64, "base64");
+}
+
+// Usa a foto REAL do cliente como base e pede à IA para melhorá-la (luz, fundo, superfície, clima de foto profissional)
+// sem trocar o produto. Se a IA falhar ou o produto mudar, quem chama usa a foto original tratada.
+export async function melhorarFoto(base: Buffer, produto: string, restricao = ""): Promise<Buffer> {
+  const chave = process.env.OPENAI_API_KEY;
+  if (!chave) throw new Error("OPENAI_API_KEY não configurada");
+  const prompt =
+    `Edit this real product photo into a professional commercial food/product photograph. KEEP THE PRODUCT EXACTLY AS IT IS: same shape, same proportions, ` +
+    `same colors, same glaze/texture, same openings or holes, same quantity. Do not redraw, restyle or replace the product. ` +
+    `Only improve the photography: soft bright natural window daylight, clean light neutral surface (white, cream or light linen), simple uncluttered background, ` +
+    `product centered with comfortable breathing room on all sides, correct white balance, gentle realistic shadows, crisp focus, true-to-life colors, ` +
+    `natural imperfections kept, authentic camera photo look, not a render. Remove distracting dark or messy elements around it. ` +
+    `Square composition. ${produto ? `The product is: ${produto}. ` : ""}${restricao ? `Client restriction: ${restricao}. ` : ""}` +
+    `Absolutely no text, letters, numbers, logos or watermarks.`;
+  const form = new FormData();
+  form.append("model", MODELO);
+  form.append("prompt", prompt);
+  form.append("size", "1024x1024");
+  form.append("quality", QUALIDADE);
+  form.append("input_fidelity", "high");
+  form.append("output_format", "jpeg");
+  form.append("n", "1");
+  form.append("image", new Blob([new Uint8Array(base)], { type: "image/jpeg" }), "foto.jpg");
+  const res = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { authorization: `Bearer ${chave}` }, body: form });
+  if (!res.ok) await lerErro(res);
+  const j = await res.json();
+  const b64 = j.data?.[0]?.b64_json;
+  if (!b64) throw new Error("A edição de imagem não devolveu a foto");
+  if (j.usage) console.log("OpenAI edição uso:", JSON.stringify(j.usage));
   return Buffer.from(b64, "base64");
 }
 
@@ -190,6 +221,15 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
     if (escolhida) {
       foto = escolhida;
       visual.origem = "foto-cliente";
+      // A IA parte da foto real e a melhora; só vale se o produto continuar idêntico (senão fica a foto original tratada)
+      try {
+        const melhor = await melhorarFoto(escolhida, briefing.sobre ?? cliente?.ramo ?? "", briefing.evitar ?? "");
+        const conf = await mesmoProduto(escolhida, melhor, briefing.sobre ?? cliente?.ramo ?? "");
+        if (conf.igual) { foto = melhor; visual.origem = "foto-melhorada"; }
+        else console.warn("[melhorar-foto] produto mudou, usando a original:", conf.motivo);
+      } catch (e: any) {
+        console.error("[melhorar-foto] falhou, usando a original:", e?.message);
+      }
     } else if (produtoReal) {
       foto = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#ffffff" } }).jpeg().toBuffer();
       visual.origem = "arte-grafica";

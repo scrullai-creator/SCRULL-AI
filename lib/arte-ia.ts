@@ -230,3 +230,34 @@ export async function aplicarLogo(arte: Buffer, logo: { bytes: Buffer } | null):
   const selo = await sharp(fundo).composite([{ input: arred, blend: "dest-in" }]).png().toBuffer();
   return base.composite([{ input: selo, left: 1024 - w - 36, top: 1024 - h - 36 }]).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
 }
+
+
+// Compara a foto ORIGINAL do cliente com a versão melhorada pela IA: o produto tem que ser o mesmo
+// (forma, furo, cor, textura, quantidade). Se mudou, a versão melhorada é descartada.
+export async function mesmoProduto(original: Buffer, editada: Buffer, produto: string): Promise<{ igual: boolean; motivo: string }> {
+  const peq = (b: Buffer) => sharp(b).resize(640, 640, { fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
+  const [a, b] = await Promise.all([peq(original), peq(editada)]);
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: MODELO_REVISAO, max_tokens: 1000, output_config: { effort: "low" },
+      messages: [{ role: "user", content: [
+        { type: "text", text: "Imagem 1: foto ORIGINAL do produto real." },
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: a.toString("base64") } },
+        { type: "text", text: "Imagem 2: versão melhorada pela IA." },
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b.toString("base64") } },
+        { type: "text", text: `O produto é: ${produto || "o produto da foto"}. O produto da imagem 2 é EXATAMENTE o mesmo da imagem 1 (mesma forma, furo/aberturas, cor, brilho, textura, tamanho, quantidade)? ` +
+          `Mudar o fundo, a luz e a superfície é permitido; mudar o produto não. Reprove também se houver texto, letras ou logos na imagem 2. ` +
+          `Responda SOMENTE JSON: {"igual": true|false, "motivo": "curto"}` },
+      ] }],
+    }),
+  }).catch(() => null);
+  if (!res?.ok) return { igual: false, motivo: "revisão indisponível" };
+  const j = await res.json();
+  const t: string = (j.content ?? []).map((x: any) => x.text ?? "").join("");
+  try {
+    const r = JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1));
+    return { igual: r.igual === true, motivo: String(r.motivo ?? "").slice(0, 300) };
+  } catch { return { igual: false, motivo: "resposta ilegível" }; }
+}
