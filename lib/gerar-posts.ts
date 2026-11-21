@@ -131,6 +131,9 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `não pode ter o mesmo layout nem o mesmo tipo de assunto do mais recente):\n${historico}\n\n` +
     `TAREFA: crie ${a.quantidade} posts de feed para os próximos dias. Cada post precisa parecer diferente do anterior, ` +
     `no assunto, no formato da arte e no jeito da legenda.\n\n` +
+    `O QUE O CLIENTE NÃO QUER: se o briefing tiver "O que você NÃO quer nos posts", isso é regra absoluta, ` +
+    `tanto na legenda quanto no "prompt_imagem" (descreva a foto já do jeito certo; ex.: se ele não quer pudim com furinho, ` +
+    `escreva "perfectly smooth, glossy pudding with no holes or bubbles").\n\n` +
     `VARIEDADE OBRIGATÓRIA:\n` +
     `- Assuntos: misture produto em destaque, bastidores, dica útil, curiosidade, história da marca, pergunta ao público, ` +
     `quebra de objeção, data comemorativa próxima (se fizer sentido), humor leve do dia a dia do ramo, prova real (só com fatos do briefing). ` +
