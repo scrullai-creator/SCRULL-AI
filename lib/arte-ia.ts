@@ -157,7 +157,7 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
 
 // Revisão só da FOTO (antes de o app escrever título e logo por cima), para as artes
 // montadas pelo modelo do app: nitidez, proporções, enquadramento e apelo.
-export async function revisarFoto(foto: Buffer, empresa: string, ramo: string, mensagem = "", evitar = ""): Promise<Revisao> {
+export async function revisarFoto(foto: Buffer, empresa: string, ramo: string, mensagem = "", evitar = "", limpa = false): Promise<Revisao> {
   const jpg = await sharp(foto).resize(640, 640, { fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -170,10 +170,11 @@ export async function revisarFoto(foto: Buffer, empresa: string, ramo: string, m
           { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpg.toString("base64") } },
           { type: "text", text:
             `Você é fotógrafo publicitário e diretor de arte. Esta foto vai virar um post de Instagram de "${empresa}" (${ramo}); ` +
-            `o título e a logo serão colocados depois pelo app.\n` +
+            (limpa ? `a foto será o post inteiro, sem texto por cima.\n` : `o título e a logo serão colocados depois pelo app.\n`) +
             `Reprove se: estiver borrada ou sem nitidez; houver mãos, dedos, rostos ou objetos deformados ou com proporção errada; ` +
             `houver letras, números, logos ou marcas d'água; o assunto principal não estiver claro; o enquadramento estiver torto ou cortando o assunto de forma estranha; ` +
             `o produto ou a cena for genérico e sem apelo; não combinar com esse tipo de negócio; parecer artificial ou amador` +
+            (limpa ? `; parecer foto gerada por IA (superfície de plástico ou cera, perfeita ou simétrica demais, cor saturada demais, aspecto de renderização 3D); estar escura, com fundo escuro ou clima dramático (queremos foto clara, natural, de luz do dia)` : ``) +
             (mensagem ? `; a foto não tiver nenhuma relação com a mensagem do post: "${mensagem}"` : "") +
             (evitar ? `; a foto mostrar algo que o cliente pediu para NÃO aparecer: "${evitar}"` : "") + `.\n` +
             `Responda SOMENTE JSON: {"nota": 0-10, "problemas": "lista curta em inglês do que corrigir, vazia se nada"}` },
