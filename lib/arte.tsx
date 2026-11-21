@@ -70,8 +70,10 @@ export function fonteDoRamo(ramo: string, id: string): FonteTitulo {
 // Devolve a arte final em JPEG
 export async function montarArte(d: DadosArte): Promise<Buffer> {
   const ft: FonteTitulo = d.fonteTitulo ?? "Jakarta";
-  const [f800, f700, fTit] = await Promise.all([
+  const [f800, f700, fMarca, fTit] = await Promise.all([
     fonte(800), fonte(700),
+    readFile(path.join(process.cwd(), "lib", "fontes", "outfit-latin-500-normal.woff"))
+      .then((b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer),
     ft === "Jakarta" ? Promise.resolve(null) : readFile(path.join(process.cwd(), "lib", "fontes", ARQ_FONTE[ft]))
       .then((b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer),
   ]);
@@ -108,8 +110,8 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
           <div style={{ position: "absolute", right: 40, bottom: 40, display: "flex" }}>{marca}</div>
         ) : (
           // Marca d'água discreta com o nome do negócio, aplicada pelo app (nunca pedida à IA de imagem)
-          <div style={{ position: "absolute", right: 36, bottom: 30, display: "flex", fontFamily: "Jakarta", fontSize: 26, fontWeight: 800,
-            letterSpacing: 2, color: "rgba(255,255,255,0.88)", textShadow: "0 1px 8px rgba(0,0,0,0.55)" }}>{d.nomeEmpresa.toUpperCase()}</div>
+          <div style={{ position: "absolute", right: 36, bottom: 30, display: "flex", fontFamily: "Marca", fontSize: 22, fontWeight: 500,
+            letterSpacing: 5, color: "rgba(255,255,255,0.5)", textShadow: "0 1px 5px rgba(0,0,0,0.22)" }}>{d.nomeEmpresa.toUpperCase()}</div>
         )}
       </div>
     );
@@ -199,6 +201,7 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
       fonts: [
         { name: "Jakarta", data: f800, weight: 800, style: "normal" },
         { name: "Jakarta", data: f700, weight: 700, style: "normal" },
+        { name: "Marca", data: fMarca, weight: 500, style: "normal" },
         ...(fTit ? [{ name: "Titulo", data: fTit, weight: (ft === "Bebas" ? 400 : 800) as 400 | 800, style: "normal" as const }] : []),
       ],
     }
