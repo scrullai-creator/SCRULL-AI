@@ -314,7 +314,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
         )}
         {semArte > 0 && (
           <div className="aviso" role="status">
-            {semArte === 1 ? "1 post ainda está sem arte." : `${semArte} posts ainda estão sem arte.`} Toque em "Criar arte" para ver antes de aprovar (leva uns 30 segundos). Se aprovar sem arte, ela é criada antes de publicar.
+            {semArte === 1 ? "1 post ainda está sem arte." : `${semArte} posts ainda estão sem arte.`}{" "}
+            {assinante
+              ? "A Scrull cria as artes sozinha, aos poucos, antes de cada post sair (os dos próximos 3 dias primeiro). Se quiser ver agora, toque em \"Criar arte\"."
+              : "Toque em \"Criar arte\" para ver como fica (leva uns 30 segundos)."}
           </div>
         )}
 

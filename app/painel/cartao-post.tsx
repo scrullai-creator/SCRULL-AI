@@ -12,7 +12,7 @@ export type InfoArtes = { usadasNoPost: number; porPost: number; noMes: number; 
 
 const ACOES: Record<string, string> = {
   criado: "Criado", aprovado: "Aprovado", recusado: "Recusado", arte: "Arte", legenda: "Legenda",
-  horario: "Data alterada", titulo: "Título alterado", publicando: "Enviando ao Instagram", publicado: "Publicado", falhou: "Falhou",
+  horario: "Data alterada", titulo: "Título alterado", publicando: "Enviando ao Instagram", publicado: "Publicado", falhou: "Falhou", arte_falhou: "Arte não saiu (nova tentativa mais tarde)",
 };
 
 // Valor do campo de data (AAAA-MM-DDTHH:MM) no horário de Brasília
