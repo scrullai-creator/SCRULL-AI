@@ -1,6 +1,6 @@
 "use client";
 // Criar senha nova: aberta pelo link do e-mail de "Esqueci minha senha" (o link já deixa a pessoa logada)
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseNavegador } from "@/lib/supabase-browser";
 import { Cena } from "../login/cena";
@@ -12,6 +12,25 @@ export default function NovaSenha() {
   const [ver, setVer] = useState(false);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [pronto, setPronto] = useState(false);
+
+  // O link do e-mail chega com a sessão no fim do endereço (#access_token=...): entra com ela e limpa o endereço
+  useEffect(() => {
+    (async () => {
+      const h = new URLSearchParams(window.location.hash.slice(1));
+      const s = supabaseNavegador();
+      if (h.get("error_code") || h.get("error")) {
+        setErro(h.get("error_code") === "otp_expired"
+          ? "Esse link já foi usado ou expirou. Peça um novo em \"Esqueci minha senha\"."
+          : "Não foi possível abrir o link. Peça um novo em \"Esqueci minha senha\".");
+      } else if (h.get("access_token") && h.get("refresh_token")) {
+        const { error } = await s.auth.setSession({ access_token: h.get("access_token")!, refresh_token: h.get("refresh_token")! });
+        if (error) setErro("Esse link expirou. Peça um novo em \"Esqueci minha senha\".");
+      }
+      history.replaceState(null, "", window.location.pathname);
+      setPronto(true);
+    })();
+  }, []);
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +68,8 @@ export default function NovaSenha() {
         <div><label htmlFor="ns1">Senha nova</label><input id="ns1" type={ver ? "text" : "password"} value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" required minLength={8} /></div>
         <div><label htmlFor="ns2">Repita a senha</label><input id="ns2" type={ver ? "text" : "password"} value={conf} onChange={(e) => setConf(e.target.value)} autoComplete="new-password" required minLength={8} /></div>
         <button type="button" className="v" onClick={() => setVer((v) => !v)} aria-pressed={ver}>{ver ? "Ocultar senhas" : "Mostrar senhas"}</button>
-        <button className="b" disabled={carregando}>{carregando ? "Salvando…" : "Salvar e entrar"}</button>
+        <button className="b" disabled={carregando || !pronto}>{carregando ? "Salvando…" : "Salvar e entrar"}</button>
+        <a href="/login" style={{ color: "#6d28d9", fontSize: 13, fontWeight: 600 }}>Voltar para entrar</a>
       </form>
     </div>
   );
