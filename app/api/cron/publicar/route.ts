@@ -52,7 +52,10 @@ async function rodar(req: NextRequest) {
   const pausados = new Set((cfgs ?? []).filter((c) => c.pausado).map((c) => c.cliente_id));
 
   const resultado: { id: string; ok: boolean; motivo?: string }[] = [];
+  const inicioRodada = Date.now();
   for (const p of (fila ?? []).filter((p) => !pausados.has(p.cliente_id)).slice(0, POR_RODADA)) {
+    // Criar a arte pode levar até ~90 s: só começa outro post se ainda houver folga (o resto vai na próxima rodada)
+    if (resultado.length && (!p.imagem_url ? Date.now() - inicioRodada > 15_000 : Date.now() - inicioRodada > 80_000)) break;
     try {
       if (!p.imagem_url) {
         await gerarArteDoPost(p.id, p.cliente_id);
