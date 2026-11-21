@@ -37,7 +37,7 @@ function Check({ cor }: { cor: string }) {
   );
 }
 
-export type Layout = "faixa" | "centro" | "cartao" | "frase";
+export type Layout = "faixa" | "centro" | "cartao" | "frase" | "foto";
 
 export type DadosArte = {
   fundoJpeg: Buffer;          // foto gerada pela IA
@@ -99,7 +99,15 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
   const layout = d.layout ?? "faixa";
 
   let arte: React.ReactElement;
-  if (layout === "centro") {
+  if (layout === "foto") {
+    // Foto limpa, sem texto nem escurecimento por cima: o assunto fica na legenda. Só o selo da logo, se houver.
+    arte = (
+      <div style={{ width: W, height: W, display: "flex", position: "relative" }}>
+        <img src={fundo} width={W} height={W} style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }} />
+        {logo && <div style={{ position: "absolute", right: 40, bottom: 40, display: "flex" }}>{marca}</div>}
+      </div>
+    );
+  } else if (layout === "centro") {
     arte = (
       <div style={{ width: W, height: W, display: "flex", position: "relative", fontFamily: "Jakarta", color: "#fff" }}>
         <img src={fundo} width={W} height={W} style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }} />

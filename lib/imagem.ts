@@ -21,13 +21,21 @@ async function lerErro(res: Response) {
 }
 
 // Gera só a FOTO de fundo (sem texto nenhum): o título e a logo são escritos pelo app
-export async function gerarFoto(cena: string): Promise<Buffer> {
+export async function gerarFoto(cena: string, limpa = false): Promise<Buffer> {
   const chave = process.env.OPENAI_API_KEY;
   if (!chave) throw new Error("OPENAI_API_KEY não configurada");
-  const prompt =
-    `${cena} Photorealistic, professional photography, soft natural light, shallow depth of field. ` +
-    `Composition: keep the lower-left third of the frame simple and uncluttered (it will receive text later). ` +
-    `Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the image.`;
+  // "limpa": a foto É o post (sem texto por cima). Pede cara de foto real de fotógrafo, clara e natural, não de imagem de IA.
+  const prompt = limpa
+    ? `${cena} Authentic, real-life professional photograph taken by a commercial photographer with a full-frame camera and a 50mm lens: ` +
+      `bright natural daylight from a window, light and airy mood, light neutral surfaces (white, cream, light wood or linen), true-to-life colors, ` +
+      `natural imperfect textures (tiny crumbs, drops, slight asymmetry, real surface wear), realistic scale and proportions, a single clear hero subject, ` +
+      `gentle shallow depth of field, slightly imperfect handheld framing like a real photo. ` +
+      `NOT a render, NOT an illustration, no CGI or 3D look, no glossy plastic or wax-like surfaces, no over-saturation, no HDR, no vignette, ` +
+      `no dramatic, moody, dark or neon lighting, no dark background, no floating objects, no fake perfect symmetry. ` +
+      `Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the image.`
+    : `${cena} Photorealistic, professional photography, soft natural light, shallow depth of field. ` +
+      `Composition: keep the lower-left third of the frame simple and uncluttered (it will receive text later). ` +
+      `Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the image.`;
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { authorization: `Bearer ${chave}`, "content-type": "application/json" },
@@ -172,6 +180,8 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   } else {
     // Clientes: cada um com a própria identidade (cores do briefing ou da logo, fonte pelo ramo,
     // fotos reais que ele enviou). Nada do Scrull e nada de outro cliente entra aqui.
+    // Negócios em que o produto é o astro (comida, moda, beleza): a foto é o post, limpa, sem frase por cima
+    const fotoLimpa = segmento === "comida" || segmento === "moda" || segmento === "beleza";
     let foto: Buffer;
     if (escolhida) {
       foto = escolhida;
@@ -179,14 +189,15 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
     } else {
       const restricao = briefing.evitar ? ` CLIENT RESTRICTION (in Portuguese, follow strictly): "${briefing.evitar}".` : "";
       foto = await fotoRevisada(cena + " " + direcao.textoEnquadramento + restricao, cliente?.nome_empresa ?? "", cliente?.ramo ?? "", memoria, inicio, visual,
-        [titulo, post.subtitulo].filter(Boolean).join(" — "), briefing.evitar ?? "");
+        [titulo, post.subtitulo].filter(Boolean).join(" — "), briefing.evitar ?? "", fotoLimpa);
       visual.origem = "modelo";
     }
     visual.hash ??= await impressaoDigital(foto);
-    visual.layout = escolherLayout(post.layout, gancho, usadas);
+    const layoutFinal = fotoLimpa ? "foto" as const : escolherLayout(post.layout, gancho, usadas);
+    visual.layout = layoutFinal;
     bytes = await montarArte({
       fundoJpeg: foto, titulo, topicos: post.topicos ?? [],
-      layout: escolherLayout(post.layout, gancho, usadas), subtitulo: post.subtitulo ?? "",
+      layout: layoutFinal, subtitulo: post.subtitulo ?? "",
       logo, nomeEmpresa: cliente?.nome_empresa ?? "",
       cor: corHex ?? corDaMarca(""),
       fonteTitulo: fonteDoRamo(cliente?.ramo ?? "", clienteId),
@@ -215,9 +226,9 @@ async function lerMemoria(clienteId: string, postId: string): Promise<Visual[]> 
 // Foto criada pela IA para o modelo do app: o Claude revisa (nitidez, proporção, enquadramento, apelo)
 // e a memória confere se não ficou parecida demais com uma arte recente. Se reprovar e ainda houver
 // tempo, refaz UMA vez com as correções (para não gastar o saldo) e fica com a melhor das duas.
-async function fotoRevisada(cena: string, empresa: string, ramo: string, memoria: Visual[], inicio: number, visual: Visual, mensagem = "", evitar = "") {
-  const foto = await gerarFoto(cena);
-  const [rev, hash] = await Promise.all([revisarFoto(foto, empresa, ramo, mensagem, evitar), impressaoDigital(foto)]);
+async function fotoRevisada(cena: string, empresa: string, ramo: string, memoria: Visual[], inicio: number, visual: Visual, mensagem = "", evitar = "", limpa = false) {
+  const foto = await gerarFoto(cena, limpa);
+  const [rev, hash] = await Promise.all([revisarFoto(foto, empresa, ramo, mensagem, evitar, limpa), impressaoDigital(foto)]);
   const repetida = parecidaDemais(hash, memoria);
   console.log("Foto revisão:", empresa, rev.nota, rev.aprovada ? "aprovada" : `reprovada: ${rev.problemas}`, repetida ? "(parecida com arte recente)" : "");
   visual.nota = rev.nota; visual.hash = hash;
@@ -225,8 +236,8 @@ async function fotoRevisada(cena: string, empresa: string, ramo: string, memoria
 
   const correcoes = [rev.aprovada ? "" : rev.problemas,
     repetida ? "Too similar to a recent post: use a clearly different camera angle, setting and color mood." : ""].filter(Boolean).join(" ");
-  const nova = await gerarFoto(`${cena} FIX THESE PROBLEMS: ${correcoes}`);
-  const [rev2, hash2] = await Promise.all([revisarFoto(nova, empresa, ramo, mensagem, evitar), impressaoDigital(nova)]);
+  const nova = await gerarFoto(`${cena} FIX THESE PROBLEMS: ${correcoes}`, limpa);
+  const [rev2, hash2] = await Promise.all([revisarFoto(nova, empresa, ramo, mensagem, evitar, limpa), impressaoDigital(nova)]);
   console.log("Foto revisão (2ª):", empresa, rev2.nota, rev2.aprovada ? "aprovada" : `reprovada: ${rev2.problemas}`);
   if (rev2.nota >= rev.nota || repetida) { visual.nota = rev2.nota; visual.hash = hash2; return nova; }
   return foto;
