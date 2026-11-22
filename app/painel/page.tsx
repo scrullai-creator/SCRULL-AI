@@ -249,6 +249,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
                 Quanto mais a Scrull souber sobre a sua empresa, mais os posts parecem feitos por quem conhece o negócio.
               </p>
               <form action={salvarPerfil}>
+                <label htmlFor="nome_empresa">Nome do negócio ou do perfil <small className="dica">Aparece nas artes e nos textos.</small></label>
+                <input id="nome_empresa" name="nome_empresa" className="campo"
+                  defaultValue={cliente?.nome_empresa && cliente.nome_empresa !== "Minha empresa" ? cliente.nome_empresa : ""}
+                  placeholder="Ex.: Divinatto Pudim Perfeito" required maxLength={60} />
                 <label htmlFor="ramo">O que a sua empresa vende?</label>
                 <input id="ramo" name="ramo" className="campo" defaultValue={cliente?.ramo ?? ""}
                   placeholder="Ex.: loja de roupas, oficina de motos, salão" required maxLength={120} />

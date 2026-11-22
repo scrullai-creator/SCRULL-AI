@@ -36,7 +36,9 @@ export async function salvarPerfil(f: FormData) {
     if (v) briefing[chave] = v;
   }
 
+  const nome = String(f.get("nome_empresa") ?? "").trim().slice(0, 60);
   const dados: Record<string, unknown> = { briefing };
+  if (nome) dados.nome_empresa = nome;
   if (ramo) dados.ramo = ramo;
   if (tom) dados.tom_de_voz = tom;
 
