@@ -81,7 +81,7 @@ export default function Inicio() {
           <div className="lp-plano">
             <span className="lp-tag cinza">Para começar</span>
             <h3>Essencial</h3>
-            <p className="lp-preco"><b>R$ 99,90</b><small>/mês</small></p>
+            <p className="lp-preco"><b>R$ 79,90</b><small>/mês</small></p>
             <ul>
               <li>4 posts por semana no feed</li>
               <li>Arte, legenda e hashtags criadas pela IA</li>
@@ -94,7 +94,7 @@ export default function Inicio() {
           <div className="lp-plano destaque">
             <span className="lp-tag">Preço de lançamento</span>
             <h3>Scrull</h3>
-            <p className="lp-preco"><s>R$ 199,90</s><b>R$ 129,90</b><small>/mês</small></p>
+            <p className="lp-preco"><s>R$ 129,90</s><b>R$ 99,90</b><small>/mês</small></p>
             <ul>
               <li>1 post por dia no feed, todos os dias</li>
               <li>Arte, legenda e hashtags criadas pela IA</li>
@@ -107,7 +107,7 @@ export default function Inicio() {
           <div className="lp-plano">
             <span className="lp-tag cinza">Em breve</span>
             <h3>Premium</h3>
-            <p className="lp-preco"><b>R$ 299,00</b><small>/mês</small></p>
+            <p className="lp-preco"><b>R$ 299,90</b><small>/mês</small></p>
             <ul>
               <li>Tudo do plano Scrull</li>
               <li>Stories</li>
