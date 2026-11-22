@@ -3,6 +3,7 @@
 // Depois o Claude revisa a arte pronta (texto certo e legível, foto clara, sem espaço morto)
 // e, se reprovar, a arte é refeita uma vez com as correções.
 import sharp from "sharp";
+import { gerarComGemini } from "./gemini";
 
 const MODELO_IMG = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5";
 const QUALIDADE = process.env.OPENAI_ART_QUALITY ?? process.env.OPENAI_IMAGE_QUALITY ?? "medium";
@@ -60,6 +61,9 @@ function montarPrompt(p: PedidoArte, correcoes?: string) {
 }
 
 async function chamarOpenAI(prompt: string, referencias: Buffer[]): Promise<Buffer> {
+  // Principal: Nano Banana 2.1 (Google). Reserva: GPT, se o Google falhar ou não estiver configurado.
+  const doGoogle = await gerarComGemini(prompt, referencias);
+  if (doGoogle) return doGoogle;
   const chave = process.env.OPENAI_API_KEY;
   if (!chave) throw new Error("OPENAI_API_KEY não configurada");
   let res: Response;

@@ -9,6 +9,7 @@ import { segmentoDoRamo, escolherDirecao, impressaoDigital, parecidaDemais, type
 import sharp from "sharp";
 import { lerBriefing } from "./briefing";
 import { listarFotos, prepararFoto } from "./fotos";
+import { gerarComGemini } from "./gemini";
 
 const MODELO = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5";
 const QUALIDADE = process.env.OPENAI_IMAGE_QUALITY ?? "medium"; // low | medium | high
@@ -36,6 +37,8 @@ export async function gerarFoto(cena: string, limpa = false): Promise<Buffer> {
     : `${cena} Photorealistic, professional photography, soft natural light, shallow depth of field. ` +
       `Composition: keep the lower-left third of the frame simple and uncluttered (it will receive text later). ` +
       `Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the image.`;
+  const doGoogle = await gerarComGemini(prompt);
+  if (doGoogle) return doGoogle;
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { authorization: `Bearer ${chave}`, "content-type": "application/json" },
@@ -67,6 +70,8 @@ export async function criarComReferencia(refs: Buffer[], cena: string, sobre: st
     `varied and creative composition, not a render, not plastic, no HDR. ` +
     `${evitar ? `CLIENT RESTRICTION (in Portuguese, follow strictly, never show this): "${evitar}". ` : ""}` +
     `Absolutely no text, letters, numbers, logos or watermarks anywhere in the image.`;
+  const doGoogle = await gerarComGemini(prompt, refs);
+  if (doGoogle) return doGoogle;
   const form = new FormData();
   form.append("model", MODELO);
   form.append("prompt", prompt);
