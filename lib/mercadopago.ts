@@ -16,7 +16,7 @@ async function mp(caminho: string, init?: RequestInit) {
   });
   const j = await res.json().catch(() => null);
   if (!res.ok || !j) {
-    console.error("Mercado Pago erro:", res.status, j?.message ?? "", j?.error ?? "");
+    console.error("Mercado Pago erro:", res.status, caminho, JSON.stringify(j ?? {}).slice(0, 900));
     throw new Error(j?.message ?? `Mercado Pago respondeu com erro ${res.status}`);
   }
   return j;
