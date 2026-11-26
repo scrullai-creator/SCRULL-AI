@@ -53,6 +53,8 @@ const AVISOS: Record<string, [string, boolean]> = {
   "perfil-erro": ["Não foi possível salvar o briefing. Tente de novo.", false],
   negado: ["Você cancelou a conexão. Quando quiser, é só tentar de novo.", false],
   erro: ["Não foi possível conectar agora. Tente de novo em instantes.", false],
+  "conta-de-outro": ["Essa conta do Instagram já está ligada a outro perfil do Scrull. Conecte de novo e escolha a conta deste negócio.", false],
+  "escolha-expirou": ["A escolha da conta expirou. Clique em conectar o Instagram de novo.", false],
   "sem-conta": ["Nenhuma conta do Instagram foi compartilhada. Conecte de novo e selecione a conta da sua empresa.", false],
   "conta-pessoal": ["Essa conta é pessoal. Mude para Comercial ou Criador nas configurações do Instagram e conecte de novo.", false],
 };

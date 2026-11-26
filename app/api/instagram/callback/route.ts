@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
-import { trocarCodigo, perfil, SemContaInstagram } from "@/lib/instagram";
+import { trocarCodigo, contasDoToken, SemContaInstagram } from "@/lib/instagram";
 import { cifrar } from "@/lib/crypto";
-import { paginaDoFacebook } from "@/lib/facebook";
+import { salvarConexao, ContaDeOutroCliente, COOKIE_PENDENTE, type Pendente } from "@/lib/conexao";
 
 export async function GET(req: NextRequest) {
   const base = process.env.APP_URL!;
@@ -36,43 +36,24 @@ export async function GET(req: NextRequest) {
   try {
     const cleanCode = code.replace(/#.*$/, "");
     const acesso = await trocarCodigo(cleanCode);
-    const p = await perfil(acesso.token);
+    const contas = await contasDoToken(acesso.token);
+    if (!contas.length) throw new SemContaInstagram("Nenhuma conta do Instagram foi compartilhada");
 
-    const { data: conta, error } = await db
-      .from("contas_instagram")
-      .upsert(
-        { cliente_id: user.id, ig_user_id: p.userId, ig_username: p.username, ativa: true },
-        { onConflict: "cliente_id,ig_user_id" }
-      )
-      .select("id")
-      .single();
-    if (error) throw error;
-
-    const { error: erroToken } = await db.from("tokens_instagram").upsert({
-      conta_id: conta.id,
-      token_cifrado: cifrar(acesso.token),
-      // token de usuário do sistema não expira: guarda uma data bem distante
-      expira_em: (acesso.expiraEm ?? new Date("2099-12-31T00:00:00Z")).toISOString(),
-      atualizado_em: new Date().toISOString(),
-    });
-    if (erroToken) throw erroToken;
-
-    // Extra: Página do Facebook ligada ao Instagram. Se não houver ou der erro,
-    // o Instagram continua conectado normalmente.
-    const pagina = await paginaDoFacebook(acesso.token, p.userId);
-    if (pagina) {
-      const [r1, r2] = await Promise.all([
-        db.from("contas_instagram").update({ fb_page_id: pagina.id, fb_page_nome: pagina.nome }).eq("id", conta.id),
-        db.from("tokens_instagram").update({ fb_page_token_cifrado: cifrar(pagina.token) }).eq("conta_id", conta.id),
-      ]);
-      if (r1.error || r2.error) console.error("Página do Facebook não foi salva:", r1.error?.message ?? r2.error?.message);
-    } else {
-      await db.from("contas_instagram").update({ fb_page_id: null, fb_page_nome: null }).eq("id", conta.id);
+    // Mais de uma conta no mesmo login: o cliente escolhe qual é a deste perfil (nunca pega a primeira sozinho)
+    if (contas.length > 1) {
+      const pendente: Pendente = { userId: user.id, token: acesso.token, expiraEm: acesso.expiraEm?.toISOString() ?? null, criadoEm: Date.now() };
+      const res = NextResponse.redirect(`${base}/painel/escolher-instagram`);
+      res.cookies.set(COOKIE_PENDENTE, cifrar(JSON.stringify(pendente)), {
+        httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 600,
+      });
+      return res;
     }
 
+    await salvarConexao(user.id, acesso.token, acesso.expiraEm, contas[0]);
     return volta("ok");
   } catch (e) {
     if (e instanceof SemContaInstagram) return volta("sem-conta");
+    if (e instanceof ContaDeOutroCliente) return volta("conta-de-outro");
     console.error("Erro no login do Instagram:", e);
     return volta("erro");
   }

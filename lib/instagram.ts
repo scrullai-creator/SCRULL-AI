@@ -55,10 +55,16 @@ export class SemContaInstagram extends Error {}
 
 // Com esse tipo de token, /me é o usuário do sistema, não a conta do Instagram.
 // As contas que o cliente compartilhou ficam em /me/assigned_instagram_accounts.
-export async function perfil(token: string) {
-  const p = new URLSearchParams({ fields: "id,username", access_token: token });
+// Todas as contas compartilhadas. Quem tem vários Instagrams no mesmo portfólio (ex.: a dona do app,
+// com @scrull.ai, a pizzaria e o perfil pessoal) recebe todos no mesmo token: o cliente escolhe qual ligar.
+export async function contasDoToken(token: string): Promise<{ userId: string; username: string }[]> {
+  const p = new URLSearchParams({ fields: "id,username", access_token: token, limit: "100" });
   const j = await json(await fetch(`${GRAPH}/me/assigned_instagram_accounts?${p}`));
-  const conta = (j.data ?? [])[0];
-  if (!conta?.id) throw new SemContaInstagram("Nenhuma conta do Instagram foi compartilhada");
-  return { userId: String(conta.id), username: String(conta.username ?? "") };
+  return (j.data ?? []).filter((c: any) => c?.id).map((c: any) => ({ userId: String(c.id), username: String(c.username ?? "") }));
+}
+
+export async function perfil(token: string) {
+  const conta = (await contasDoToken(token))[0];
+  if (!conta) throw new SemContaInstagram("Nenhuma conta do Instagram foi compartilhada");
+  return conta;
 }
