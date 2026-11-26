@@ -53,7 +53,7 @@ export function CartaoPost(p: {
           <div>
             <b>{post.titulo_arte}</b>
             {post.subtitulo && <span>{post.subtitulo}</span>}
-            {!!post.topicos?.length && <ul>{post.topicos.map((t: string) => <li key={t}>✓ {t}</li>)}</ul>}
+            {!!post.topicos?.length && <ul>{post.topicos.map((t: string) => <li key={t}>✓ {t.replace("|", ": ")}</li>)}</ul>}
           </div>
         )}
       </div>

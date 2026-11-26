@@ -37,7 +37,7 @@ function Check({ cor }: { cor: string }) {
   );
 }
 
-export type Layout = "faixa" | "centro" | "cartao" | "frase" | "foto" | "marca";
+export type Layout = "faixa" | "centro" | "cartao" | "frase" | "foto" | "marca" | "receita";
 
 export type DadosArte = {
   fundoJpeg: Buffer;          // foto gerada pela IA
@@ -49,6 +49,7 @@ export type DadosArte = {
   nomeEmpresa: string;
   cor: string;                // cor de destaque (hex)
   fonteTitulo?: FonteTitulo;  // fonte do título, escolhida pelo ramo de cada cliente
+  ingredientes?: { grupo: string; itens: string[] }[]; // layout "receita": cartão com a lista de ingredientes
 };
 
 // Fonte do título de cada cliente: segue o ramo (fica sempre a mesma para a marca ser reconhecida)
@@ -101,7 +102,53 @@ export async function montarArte(d: DadosArte): Promise<Buffer> {
   const layout = d.layout ?? "faixa";
 
   let arte: React.ReactElement;
-  if (layout === "foto") {
+  if (layout === "receita") {
+    // Cartão de receita: foto do prato em cima, papel embaixo com o nome da receita e os ingredientes em colunas
+    const grupos = (d.ingredientes ?? []).filter((g) => g.itens.length);
+    const total = grupos.reduce((n, g) => n + g.itens.length, 0);
+    // Sem partes: divide a lista em duas colunas
+    let colunas: { grupo: string; itens: string[] }[] = grupos.slice(0, 2);
+    if (grupos.length === 1 && total > 5) {
+      const metade = Math.ceil(total / 2);
+      colunas = [{ grupo: grupos[0].grupo, itens: grupos[0].itens.slice(0, metade) }, { grupo: "", itens: grupos[0].itens.slice(metade) }];
+    } else if (grupos.length > 2) {
+      colunas = [grupos[0], { grupo: grupos.slice(1).map((g) => g.grupo).filter(Boolean).join(" e "), itens: grupos.slice(1).flatMap((g) => g.itens) }];
+    }
+    const maior = Math.max(1, ...colunas.map((c) => c.itens.length + (c.grupo ? 1 : 0)));
+    const altFoto = maior > 7 ? 430 : maior > 5 ? 470 : maior > 3 ? 540 : 600;
+    const tamItem = maior > 7 ? 21 : maior > 4 ? 24 : 28;
+    const marrom = "#3b2414";
+    const destaque = d.cor === "#0b1437" ? "#8a4b1f" : d.cor;
+    const tamNome = titulo.length > 26 ? 44 : titulo.length > 18 ? 52 : 60;
+    arte = (
+      <div style={{ width: W, height: W, display: "flex", flexDirection: "column", fontFamily: "Jakarta", color: marrom,
+        background: "linear-gradient(180deg, #f6eddc 0%, #efe2c9 100%)" }}>
+        <img src={fundo} width={W} height={altFoto} style={{ objectFit: "cover" }} />
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, padding: "26px 110px 22px", position: "relative" }}>
+          <div style={{ display: "flex", justifyContent: "center", textAlign: "center", fontSize: tamNome, fontWeight: 800, lineHeight: 1.04,
+            letterSpacing: -0.5, textTransform: "uppercase", fontFamily: "Titulo" }}>{titulo}</div>
+          {sub && <div style={{ display: "flex", justifyContent: "center", fontSize: 24, fontWeight: 700, marginTop: 6, color: destaque }}>{sub}</div>}
+          <div style={{ display: "flex", width: "100%", height: 0, borderTop: `3px dashed ${marrom}55`, margin: "14px 0 12px" }} />
+          <div style={{ display: "flex", flex: 1, gap: 34 }}>
+            {colunas.map((c, ci) => (
+              <div key={ci} style={{ display: "flex", flexDirection: "column", flex: 1,
+                ...(ci > 0 ? { borderLeft: `2px dashed ${marrom}55`, paddingLeft: 30 } : {}) }}>
+                {c.grupo && <div style={{ display: "flex", fontSize: tamItem + 5, fontWeight: 800, color: destaque, marginBottom: 4 }}>{c.grupo}:</div>}
+                {c.itens.map((t, i) => (
+                  <div key={i} style={{ display: "flex", fontSize: tamItem, fontWeight: 700, lineHeight: 1.22, marginTop: 5 }}>
+                    <span style={{ display: "flex", marginRight: 10, color: destaque }}>•</span>
+                    <span style={{ display: "flex", flex: 1 }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div style={{ position: "absolute", right: 110, bottom: 14, display: "flex", fontFamily: "Marca", fontSize: 17, letterSpacing: 4,
+            color: `${marrom}88` }}>{d.nomeEmpresa.toUpperCase()}</div>
+        </div>
+      </div>
+    );
+  } else if (layout === "foto") {
     // Foto limpa, sem texto nem escurecimento por cima: o assunto fica na legenda. Só o selo da logo, se houver.
     arte = (
       <div style={{ width: W, height: W, display: "flex", position: "relative" }}>

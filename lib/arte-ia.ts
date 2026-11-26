@@ -22,13 +22,24 @@ export type PedidoArte = {
   reservarCantoLogo: boolean;  // deixa o canto inferior direito livre para a logo
   assinatura?: string;         // ex.: "@scrull.ai", escrito pequeno num canto
   evitar?: string;             // o que o cliente NÃO quer (texto dele, em português): vale para a imagem e a revisão
+  // Perfil de receitas, modelo "potes": cada ingrediente num potinho com esta etiqueta de quantidade
+  rotulos?: string[];
 };
+
+// Todos os textos que a arte precisa ter, na ordem
+const textosDaArte = (p: PedidoArte) => [p.titulo, p.subtitulo ?? "", ...(p.topicos ?? []), ...(p.rotulos ?? [])].filter(Boolean);
 
 function montarPrompt(p: PedidoArte, correcoes?: string) {
   const textos = [
     `HEADLINE (the biggest element, bold, high contrast, roughly a third of the image): "${p.titulo}"`,
     p.subtitulo ? `SUBTITLE (smaller, one line): "${p.subtitulo}"` : "",
     p.topicos?.length ? `SHORT LIST (2–3 items, with simple check icons): ${p.topicos.map((t) => `"${t}"`).join(", ")}` : "",
+    p.rotulos?.length
+      ? `INGREDIENT LABELS (recipe card style): on the right side, a vertical column of ${p.rotulos.length} small clear glass bowls, ` +
+        `each one holding the real ingredient it names (eggs, sugar, oil, juice, flour, baking powder...), and next to each bowl a rounded cream label ` +
+        `with dark brown text reading exactly, in this order from top to bottom: ${p.rotulos.map((t) => `"${t}"`).join(", ")}. ` +
+        `The finished dish is the hero on the left/bottom half, large and appetizing; the headline goes at the top left, big, in a warm bold recipe-book style.`
+      : "",
   ].filter(Boolean).join("\n");
   const refs = (p.referencias ?? []).map((r) =>
     r.tipo === "produto"
@@ -93,7 +104,7 @@ export type Revisao = { aprovada: boolean; nota: number; problemas: string; text
 
 // A IA de imagem às vezes erra acentos e letras ("jà", "prónta"). Por isso o revisor transcreve
 // o texto da arte letra por letra, e o app compara com o texto certo, sem confiar só na opinião dele.
-const normalizar = (t: string) => t.toLowerCase().replace(/[“”"'.,!?:;…()\-–—]/g, " ").replace(/\s+/g, " ").trim();
+const normalizar = (t: string) => t.toLowerCase().replace(/½/g, "1/2").replace(/¼/g, "1/4").replace(/¾/g, "3/4").replace(/(\d)\s*\/\s*(\d)/g, "$1/$2").replace(/[“”"'.,!?:;…()\-–—]/g, " ").replace(/\s+/g, " ").trim();
 export function textoConfere(esperados: string[], lido: string[]): { ok: boolean; faltando: string[] } {
   const tudo = normalizar(lido.join(" "));
   const faltando = esperados.filter((e) => e && !tudo.includes(normalizar(e)));
@@ -106,7 +117,7 @@ export class TextoErrado extends Error {}
 export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao> {
   // O avaliador vê o recorte central (como a grade do perfil do Instagram mostra o post), para pegar texto cortado nas laterais
   const jpg = await sharp(arte).extract({ left: 128, top: 0, width: 768, height: 1024 }).resize(576, 768).jpeg({ quality: 85 }).toBuffer();
-  const esperado = [p.titulo, p.subtitulo, ...(p.topicos ?? [])].filter(Boolean).map((t) => `"${t}"`).join(", ");
+  const esperado = textosDaArte(p).map((t) => `"${t}"`).join(", ");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
@@ -144,7 +155,7 @@ export async function revisarArte(arte: Buffer, p: PedidoArte): Promise<Revisao>
     const r = JSON.parse(texto.slice(texto.indexOf("{"), texto.lastIndexOf("}") + 1));
     const nota = Number(r.nota) || 0;
     const lido: string[] = Array.isArray(r.texto_lido) ? r.texto_lido.map(String) : [];
-    const conf = textoConfere([p.titulo, p.subtitulo ?? "", ...(p.topicos ?? [])], lido);
+    const conf = textoConfere(textosDaArte(p), lido);
     const textoOk = !!r.texto_ok && conf.ok;
     if (!conf.ok) console.log("Arte IA: texto diferente do esperado. Faltou:", conf.faltando.join(" | "), "Lido:", lido.join(" | "));
     const problemas = [String(r.problemas ?? ""), conf.ok ? "" : `Text must read exactly: ${conf.faltando.map((t) => `"${t}"`).join(", ")}.`].filter(Boolean).join(" ");

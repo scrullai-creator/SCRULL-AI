@@ -2,6 +2,7 @@
 // decide o tema de cada post e escreve título, tópicos, legenda, hashtags
 // e a descrição da imagem (que outro serviço transforma em arte).
 import { type Briefing, briefingParaPrompt } from "./briefing";
+import { ehPerfilDeReceitas, INSTRUCOES_RECEITAS, MAX_POTES, type LayoutReceita } from "./receitas";
 
 // Sonnet escreve bem melhor que o Haiku (legendas mais humanas); custa ~R$ 0,45 por semana de posts
 const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5";
@@ -40,7 +41,7 @@ export type Layout = (typeof LAYOUTS)[number];
 
 export type PostGerado = {
   tema: string;
-  layout: Layout;
+  layout: Layout | LayoutReceita;
   titulo: string;
   subtitulo: string;
   topicos: string[];
@@ -105,6 +106,22 @@ const SCRULL_INSTITUCIONAL =
   `Luz clara e convidativa (nada de cena escura e triste), e o mascote robô roxo do Scrull FAZENDO a ação do post (fotografando o produto com o celular, ` +
   `agendando posts num tablet, arrumando a vitrine, comemorando curtidas); nunca objetos genéricos nem o robô parado; sem telas com texto legível. `;
 
+// Perfil de receitas: todo post é uma receita completa (ver lib/receitas.ts)
+function promptReceitas(a: DadosParaGerar, hoje: string, historico: string): string {
+  return (
+    `PERFIL: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\nHOJE: ${hoje}\n\n` +
+    `BRIEFING:\n${briefingParaPrompt(a.briefing)}\n\n` +
+    `O INSTAGRAM ATUAL (aprenda a voz e o que o público mais curte; não copie frases):\n${a.perfil ?? "(perfil não conectado)"}\n\n` +
+    `RECEITAS JÁ POSTADAS PELO SCRULL, da mais recente para a mais antiga (não repita nenhuma):\n${historico}\n\n` +
+    `TAREFA: crie ${a.quantidade} posts para os próximos dias.\n\n` + INSTRUCOES_RECEITAS +
+    `\nO QUE O CLIENTE NÃO QUER: se o briefing tiver "O que você NÃO quer nos posts", isso é regra absoluta na legenda e na imagem.\n` +
+    `Datas comemorativas próximas podem inspirar a escolha da receita (Natal, Páscoa, festa junina...), se fizer sentido.\n\n` +
+    `Para cada post, devolva um objeto com: "tema" (nome curto da receita), "layout", "titulo", "subtitulo", "ingredientes", ` +
+    `"legenda", "hashtags", "prompt_imagem".\n\n` +
+    `Responda SOMENTE um array JSON com ${a.quantidade} objetos, sem comentários.`
+  );
+}
+
 export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: string } {
   const hoje = new Date().toLocaleDateString("pt-BR", {
     weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Sao_Paulo",
@@ -120,6 +137,8 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `"potencialize", "descubra", "transforme"). ` +
     `Nunca inventa preços, endereços, telefones, números de clientes, prêmios ou depoimentos. ` +
     `Só fala de oferta se o briefing tiver uma. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA;
+
+  if (ehPerfilDeReceitas(a.empresa, a.ramo)) return { sistema, usuario: promptReceitas(a, hoje, historico) };
 
   const usuario =
     `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\nHOJE: ${hoje}\n\n` +
@@ -248,6 +267,7 @@ export async function criarPosts(a: DadosParaGerar): Promise<PostGerado[]> {
   }
 
   const limpar = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+  if (ehPerfilDeReceitas(a.empresa, a.ramo)) return postsDeReceita(lista, a, limpar);
   return lista.slice(0, a.quantidade).map((p: any, i: number) => ({
     tema: limpar(p.tema, 60),
     layout: (LAYOUTS as readonly string[]).includes(p.layout) ? p.layout : LAYOUTS[i % LAYOUTS.length],
@@ -262,6 +282,40 @@ export async function criarPosts(a: DadosParaGerar): Promise<PostGerado[]> {
       .slice(0, 8),
     prompt_imagem: limpar(p.prompt_imagem, 1500),
   })).filter((p: PostGerado) => p.legenda && p.titulo);
+}
+
+// Perfil de receitas: ingredientes vão para "topicos" ("Parte|item") e os dois modelos de arte se alternam
+function postsDeReceita(lista: unknown[], a: DadosParaGerar, limpar: (v: unknown, max: number) => string): PostGerado[] {
+  const hashtags = (v: unknown) => (Array.isArray(v) ? v : [])
+    .map((h: unknown) => limpar(h, 40))
+    .map((h: string) => (h.startsWith("#") ? h : `#${h.replace(/\s+/g, "")}`))
+    .filter((h: string) => h.length > 1).slice(0, 6);
+  let anterior = a.historico[0]?.layout ?? "";
+  return lista.slice(0, a.quantidade).map((p: any) => {
+    const partes: { parte: string; itens: string[] }[] = (Array.isArray(p.ingredientes) ? p.ingredientes : [])
+      .map((g: any) => ({
+        parte: limpar(g?.parte, 24).replace(/[|:]/g, ""),
+        itens: (Array.isArray(g?.itens) ? g.itens : []).map((t: unknown) => limpar(t, 50).replace(/\|/g, "/")).filter(Boolean),
+      }))
+      .filter((g: { itens: string[] }) => g.itens.length);
+    const comParte = partes.length > 1 || partes.some((g) => g.parte);
+    const topicos = partes.flatMap((g) => g.itens.map((t) => (comParte && g.parte ? `${g.parte}|${t}` : t))).slice(0, 14);
+    // Alterna os modelos; "potes" só serve para receita curta e sem partes
+    const cabePotes = topicos.length > 0 && topicos.length <= MAX_POTES && !comParte;
+    let layout: LayoutReceita = anterior === "potes" ? "receita" : anterior === "receita" ? "potes" : (p.layout === "potes" ? "potes" : "receita");
+    if (layout === "potes" && !cabePotes) layout = "receita";
+    anterior = layout;
+    return {
+      tema: limpar(p.tema, 60),
+      layout,
+      titulo: limpar(p.titulo, 60),
+      subtitulo: limpar(p.subtitulo, 60),
+      topicos,
+      legenda: limpar(p.legenda, 2000),
+      hashtags: hashtags(p.hashtags),
+      prompt_imagem: limpar(p.prompt_imagem, 1500),
+    };
+  }).filter((p: PostGerado) => p.legenda && p.titulo && p.topicos.length);
 }
 
 // Reescreve a legenda de um post já criado, seguindo o guia de escrita humana
@@ -282,8 +336,12 @@ export async function reescreverLegenda(a: {
         content:
           `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\n\nBRIEFING:\n${briefingParaPrompt(a.briefing)}\n\n` +
           `POST: assunto "${a.tema}", título da arte "${a.titulo}".\n` +
-          `LEGENDA ATUAL (soa robótica; reescreva do zero, mantendo só o assunto):\n${a.legendaAtual}\n\n` +
-          `Responda: {"legenda": "até 600 caracteres, sem hashtags dentro", "hashtags": ["3 a 6 hashtags"]}`,
+          (ehPerfilDeReceitas(a.empresa, a.ramo)
+            ? `LEGENDA ATUAL (é uma receita; reescreva a abertura e o fechamento de um jeito mais humano, mas mantenha TODOS os ingredientes, ` +
+              `medidas e passos do modo de preparo, sem mudar a receita):\n${a.legendaAtual}\n\n` +
+              `Responda: {"legenda": "até 1800 caracteres, sem hashtags dentro, com Ingredientes e Modo de preparo", "hashtags": ["4 a 6 hashtags"]}`
+            : `LEGENDA ATUAL (soa robótica; reescreva do zero, mantendo só o assunto):\n${a.legendaAtual}\n\n` +
+              `Responda: {"legenda": "até 600 caracteres, sem hashtags dentro", "hashtags": ["3 a 6 hashtags"]}`),
       }],
     }),
   });

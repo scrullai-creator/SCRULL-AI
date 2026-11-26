@@ -9,6 +9,7 @@ import { segmentoDoRamo, escolherDirecao, impressaoDigital, parecidaDemais, type
 import sharp from "sharp";
 import { lerBriefing } from "./briefing";
 import { listarFotos, prepararFoto } from "./fotos";
+import { ehPerfilDeReceitas, agruparIngredientes } from "./receitas";
 
 const MODELO = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5";
 const QUALIDADE = process.env.OPENAI_IMAGE_QUALITY ?? "medium"; // low | medium | high
@@ -158,7 +159,9 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   const titulo = post.titulo_arte ?? cliente?.nome_empresa ?? "";
   // Fotos reais enviadas pelo cliente: as primeiras artes de cada post usam essas fotos;
   // as trocas seguintes passam para as outras e, acabando elas, para uma foto criada pela IA.
-  const fotosDoCliente = ehScrull ? [] : await listarFotos(clienteId).catch(() => []);
+  // Perfil de receitas: cada post é uma receita, com os modelos "potes" e "receita" (ver lib/receitas.ts)
+  const receitas = !ehScrull && ehPerfilDeReceitas(cliente?.nome_empresa, cliente?.ramo);
+  const fotosDoCliente = ehScrull || receitas ? [] : await listarFotos(clienteId).catch(() => []);
   const escolhida = fotosDoCliente.length > 0 && usadas < fotosDoCliente.length
     ? await prepararFoto(fotosDoCliente[(gancho + usadas) % fotosDoCliente.length].url) : null;
   const logo = ehScrull ? null : await lerLogo(cliente?.logo_url);
@@ -166,14 +169,14 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
 
   // Memória visual DESTE cliente: a próxima arte evita o estilo, o ângulo e a composição usados por último
   const memoria = await lerMemoria(clienteId, postId);
-  const segmento = ehScrull ? "tecnologia" : segmentoDoRamo(cliente?.ramo ?? "");
+  const segmento = ehScrull ? "tecnologia" : receitas ? "comida" : segmentoDoRamo(cliente?.ramo ?? "");
   const direcao = escolherDirecao(segmento, memoria, gancho, usadas, ehScrull);
   const visual: Visual = { segmento, estilo: direcao.estilo, enquadramento: direcao.enquadramento, layout: post.layout };
 
   // Arte completa pela IA (foto + texto + composição numa peça só, revisada pelo Claude).
   // Por enquanto ligada só no próprio Scrull; ARTE_IA_TODOS=1 liga para todos os clientes.
   let pronta: Buffer | null = null;
-  if (ehScrull || process.env.ARTE_IA_TODOS === "1") {
+  if (!receitas && (ehScrull || process.env.ARTE_IA_TODOS === "1")) {
     try {
       const mascote = ehScrull ? await lerMascote() : null;
       const { arte, revisao } = await criarArteCompleta({
@@ -202,6 +205,11 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
 
   if (pronta) {
     bytes = pronta;
+  } else if (receitas) {
+    bytes = await arteDeReceita({
+      post, cena, titulo, logo, briefing, inicio, memoria, visual,
+      empresa: cliente?.nome_empresa ?? "", cor: corHex,
+    });
   } else if (ehScrull) {
     // Plano B do Scrull: modelos de tecnologia montados pelo app
     const modelo = modeloScrull(post.agendado_para, usadas);
@@ -267,6 +275,45 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
   if (error && /visual/i.test(error.message)) ({ error } = await db.from("posts").update({ imagem_url: url }).eq("id", postId));
   if (error) throw error;
   return url;
+}
+
+// Arte de um post de receita. "potes": a IA desenha a peça inteira (prato + potinhos com as quantidades) e o Claude confere
+// cada etiqueta; se o texto não sair certo, ou no modelo "receita", o app monta o cartão de receita sobre uma foto do prato.
+async function arteDeReceita(a: {
+  post: { layout?: string | null; subtitulo?: string | null; topicos?: string[] | null };
+  cena: string; titulo: string; empresa: string; cor: string | null;
+  logo: { bytes: Buffer; tipo: string } | null; briefing: ReturnType<typeof lerBriefing>;
+  inicio: number; memoria: Visual[]; visual: Visual;
+}): Promise<Buffer> {
+  const ingredientes = agruparIngredientes(a.post.topicos ?? []);
+  const evitar = a.briefing.evitar ?? "";
+  if (a.post.layout === "potes") {
+    try {
+      const { arte, revisao } = await criarArteCompleta({
+        empresa: a.empresa, ramo: "perfil de receitas caseiras",
+        estilo: "Warm homemade recipe card ad, like the most shared recipe posts on Instagram: soft beige/cream background, " +
+          "natural kitchen daylight, a striped kitchen towel and fresh ingredients as props, bold dark-brown and orange headline.",
+        cores: a.briefing.cores || "warm beige and cream background, dark brown text, orange accents",
+        titulo: a.titulo, subtitulo: a.post.subtitulo ?? "", topicos: [],
+        rotulos: ingredientes.flatMap((g) => g.itens),
+        cena: a.cena, referencias: [], reservarCantoLogo: !!a.logo, evitar,
+      }, 60_000);
+      a.visual.origem = "ia-completa"; a.visual.nota = revisao.nota; a.visual.layout = "potes";
+      a.visual.hash = await impressaoDigital(arte);
+      return await aplicarLogo(arte, a.logo);
+    } catch (e: any) {
+      console.error("Receita (potes): arte da IA não passou; usando o cartão de receita:", e?.message);
+    }
+  }
+  const restricao = evitar ? ` CLIENT RESTRICTION (in Portuguese, follow strictly): "${evitar}".` : "";
+  const foto = await fotoRevisada(
+    a.cena + " Camera: 45-degree or top-down view, the whole finished dish centered and generous, appetizing, homemade, served on a plate on a light kitchen table." + restricao,
+    a.empresa, "receitas caseiras", a.memoria, a.inicio, a.visual, a.titulo, evitar, true);
+  a.visual.origem = "modelo"; a.visual.layout = "receita";
+  return montarArte({
+    fundoJpeg: foto, titulo: a.titulo, subtitulo: a.post.subtitulo ?? "", topicos: [], layout: "receita",
+    logo: null, nomeEmpresa: a.empresa, cor: a.cor ?? "#8a4b1f", fonteTitulo: "Sora", ingredientes,
+  });
 }
 
 // Últimas artes deste cliente (a arte anterior deste mesmo post vem primeiro). Sem a coluna, memória vazia.
