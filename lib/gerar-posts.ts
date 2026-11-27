@@ -3,6 +3,7 @@
 // e a descrição da imagem (que outro serviço transforma em arte).
 import { type Briefing, briefingParaPrompt } from "./briefing";
 import { ehPerfilDeReceitas, INSTRUCOES_RECEITAS, MAX_POTES, type LayoutReceita } from "./receitas";
+import { ehPerfilEspecialista, INSTRUCOES_ESPECIALISTA } from "./especialista";
 
 // Sonnet escreve bem melhor que o Haiku (legendas mais humanas); custa ~R$ 0,45 por semana de posts
 const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5";
@@ -122,6 +123,22 @@ function promptReceitas(a: DadosParaGerar, hoje: string, historico: string): str
   );
 }
 
+// Perfil de especialista: cada post é uma mini-aula com legenda longa e bem montada (ver lib/especialista.ts)
+function promptEspecialista(a: DadosParaGerar, hoje: string, historico: string): string {
+  return (
+    `PERFIL: ${a.empresa}\nÁREA: ${a.ramo}\nTOM DE VOZ: ${a.tom}\nHOJE: ${hoje}\n\n` +
+    `BRIEFING:\n${briefingParaPrompt(a.briefing)}\n\n` +
+    `O INSTAGRAM ATUAL (aprenda a voz e o que o público mais curte; não copie frases):\n${a.perfil ?? "(perfil não conectado)"}\n\n` +
+    `AULAS JÁ CRIADAS PELO SCRULL, da mais recente para a mais antiga (não repita estes temas):\n${historico}\n\n` +
+    `TAREFA: crie ${a.quantidade} posts para os próximos dias.\n\n` + INSTRUCOES_ESPECIALISTA +
+    `\nO QUE O CLIENTE NÃO QUER: se o briefing tiver "O que você NÃO quer nos posts", isso é regra absoluta na legenda e na imagem.\n\n` +
+    `TESTE ANTES DE RESPONDER: para cada legenda, pergunte "um dono de negócio aprenderia algo novo e aplicável lendo isto?". ` +
+    `Se a resposta for não, ou se parecer texto genérico de internet, reescreva com mais contexto, exemplo e passo a passo.\n\n` +
+    `Para cada post, devolva um objeto com: "tema", "layout", "titulo", "subtitulo", "topicos", "legenda", "hashtags", "prompt_imagem".\n\n` +
+    `Responda SOMENTE um array JSON com ${a.quantidade} objetos, sem comentários.`
+  );
+}
+
 export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: string } {
   const hoje = new Date().toLocaleDateString("pt-BR", {
     weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Sao_Paulo",
@@ -139,6 +156,7 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `Só fala de oferta se o briefing tiver uma. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA;
 
   if (ehPerfilDeReceitas(a.empresa, a.ramo)) return { sistema, usuario: promptReceitas(a, hoje, historico) };
+  if (ehPerfilEspecialista(a.empresa, a.ramo)) return { sistema, usuario: promptEspecialista(a, hoje, historico) };
 
   const usuario =
     `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\nHOJE: ${hoje}\n\n` +
@@ -336,7 +354,11 @@ export async function reescreverLegenda(a: {
         content:
           `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\n\nBRIEFING:\n${briefingParaPrompt(a.briefing)}\n\n` +
           `POST: assunto "${a.tema}", título da arte "${a.titulo}".\n` +
-          (ehPerfilDeReceitas(a.empresa, a.ramo)
+          (ehPerfilEspecialista(a.empresa, a.ramo)
+            ? `LEGENDA ATUAL (é uma mini-aula de especialista; reescreva com voz mais humana e segura, mantendo o tema, o exemplo prático, ` +
+              `o passo a passo numerado e a estrutura em parágrafos curtos):\n${a.legendaAtual}\n\n` +
+              `Responda: {"legenda": "de 1000 a 1900 caracteres, sem hashtags dentro", "hashtags": ["4 a 6 hashtags"]}`
+            : ehPerfilDeReceitas(a.empresa, a.ramo)
             ? `LEGENDA ATUAL (é uma receita; reescreva a abertura e o fechamento de um jeito mais humano, mas mantenha TODOS os ingredientes, ` +
               `medidas e passos do modo de preparo, sem mudar a receita):\n${a.legendaAtual}\n\n` +
               `Responda: {"legenda": "até 1800 caracteres, sem hashtags dentro, com Ingredientes e Modo de preparo", "hashtags": ["4 a 6 hashtags"]}`

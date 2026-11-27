@@ -10,6 +10,7 @@ import sharp from "sharp";
 import { lerBriefing } from "./briefing";
 import { listarFotos, prepararFoto } from "./fotos";
 import { ehPerfilDeReceitas, agruparIngredientes } from "./receitas";
+import { ehPerfilEspecialista } from "./especialista";
 
 const MODELO = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5";
 const QUALIDADE = process.env.OPENAI_IMAGE_QUALITY ?? "medium"; // low | medium | high
@@ -221,7 +222,8 @@ export async function gerarArteDoPost(postId: string, clienteId: string) {
     // Clientes: cada um com a própria identidade (cores do briefing ou da logo, fonte pelo ramo,
     // fotos reais que ele enviou). Nada do Scrull e nada de outro cliente entra aqui.
     // Negócios em que o produto é o astro (comida, moda, beleza): a foto é o post, limpa, sem frase por cima
-    const fotoLimpa = segmento === "comida" || segmento === "moda" || segmento === "beleza";
+    // Perfil de especialista: a arte é sempre capa de aula (título e pontos-chave por cima), nunca foto limpa
+    const fotoLimpa = !ehPerfilEspecialista(cliente?.nome_empresa, cliente?.ramo) && (segmento === "comida" || segmento === "moda" || segmento === "beleza");
     // Piloto "produto real": nestes clientes, sem foto real do produto o app NÃO inventa uma foto dele; usa arte gráfica da marca.
     // Ligado por cliente em PRODUTO_REAL_CLIENTES (ids separados por vírgula, ou * para todos).
     const lista = (process.env.PRODUTO_REAL_CLIENTES ?? "").split(",").map((x) => x.trim()).filter(Boolean);
