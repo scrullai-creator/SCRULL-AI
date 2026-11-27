@@ -4,6 +4,7 @@
 import { type Briefing, briefingParaPrompt } from "./briefing";
 import { ehPerfilDeReceitas, INSTRUCOES_RECEITAS, MAX_POTES, type LayoutReceita } from "./receitas";
 import { ehPerfilEspecialista, INSTRUCOES_ESPECIALISTA } from "./especialista";
+import { ehSaude, REGRAS_SAUDE } from "./saude";
 
 // Sonnet escreve bem melhor que o Haiku (legendas mais humanas); custa ~R$ 0,45 por semana de posts
 const MODELO = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5";
@@ -156,7 +157,11 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `Só fala de oferta se o briefing tiver uma. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA;
 
   if (ehPerfilDeReceitas(a.empresa, a.ramo)) return { sistema, usuario: promptReceitas(a, hoje, historico) };
-  if (ehPerfilEspecialista(a.empresa, a.ramo)) return { sistema, usuario: promptEspecialista(a, hoje, historico) };
+  // Negócios de saúde: regras dos conselhos profissionais entram junto, em qualquer modo
+  const saude = ehSaude(a.ramo) ? REGRAS_SAUDE + "\n" : "";
+  if (ehPerfilEspecialista(a.empresa, a.ramo)) {
+    return { sistema, usuario: promptEspecialista(a, hoje, historico).replace("\nO QUE O CLIENTE NÃO QUER:", "\n" + saude + "O QUE O CLIENTE NÃO QUER:") };
+  }
 
   const usuario =
     `EMPRESA: ${a.empresa}\nRAMO: ${a.ramo}\nTOM DE VOZ: ${a.tom}\nHOJE: ${hoje}\n\n` +
@@ -168,6 +173,7 @@ export function montarPrompt(a: DadosParaGerar): { sistema: string; usuario: str
     `não pode ter o mesmo layout nem o mesmo tipo de assunto do mais recente):\n${historico}\n\n` +
     `TAREFA: crie ${a.quantidade} posts de feed para os próximos dias. Cada post precisa parecer diferente do anterior, ` +
     `no assunto, no formato da arte e no jeito da legenda.\n\n` +
+    saude +
     `O QUE O CLIENTE NÃO QUER: se o briefing tiver "O que você NÃO quer nos posts", isso é regra absoluta, ` +
     `tanto na legenda quanto no "prompt_imagem" (descreva a foto já do jeito certo; ex.: se ele não quer pudim com furinho, ` +
     `escreva "perfectly smooth, glossy pudding with no holes or bubbles").\n\n` +
@@ -348,7 +354,8 @@ export async function reescreverLegenda(a: {
       model: MODELO, max_tokens: 4000, output_config: { effort: "low" },
       system:
         `Você é a social media de uma agência brasileira que cuida do Instagram de pequenos negócios. ` +
-        `Nunca inventa preços, endereços, telefones, prêmios ou depoimentos. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA,
+        `Nunca inventa preços, endereços, telefones, prêmios ou depoimentos. Responde SOMENTE com JSON válido.\n\n` + GUIA_LEGENDA +
+        (ehSaude(a.ramo) ? "\n" + REGRAS_SAUDE : ""),
       messages: [{
         role: "user",
         content:
