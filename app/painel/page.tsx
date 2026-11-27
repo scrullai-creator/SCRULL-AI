@@ -4,6 +4,7 @@ import { gerarSemana, refazerSemana, salvarPerfil, assinar, cancelar } from "./g
 import { supabaseDoUsuario } from "@/lib/supabase";
 import { CAMPOS_BRIEFING, lerBriefing } from "@/lib/briefing";
 import { ARTES_POR_POST, ARTES_DEMO, contarArtes, limiteMensal } from "@/lib/imagem";
+import { situacaoDoTeste, DIAS_GRATIS } from "@/lib/teste-gratis";
 import { CartaoPost, type Historico } from "./cartao-post";
 import { situacao, passaNoFiltro, FILTROS, type Filtro } from "@/lib/status-post";
 import Link from "next/link";
@@ -48,7 +49,8 @@ const AVISOS: Record<string, [string, boolean]> = {
   "cancel-ok": ["Assinatura cancelada. Seus posts ficam guardados caso você volte.", true],
   "cancel-erro": ["Não foi possível cancelar agora. Tente de novo em instantes.", false],
   "demo-cheia": ["Muita gente testando hoje! A demonstração grátis está lotada por hoje. Tente amanhã ou fale com a gente.", false],
-  "demo-usada": ["Sua semana grátis já foi criada. Assine para criar novas semanas, liberar todas as artes e publicar.", false],
+  "demo-usada": ["Seus dias grátis já foram criados. Assine para criar novas semanas e continuar publicando no automático.", false],
+  "teste-fim": ["Seu teste grátis terminou. Assine para a Scrull continuar publicando por você.", false],
   "img-limite": [`Limite de artes atingido: cada post pode ser trocado até ${ARTES_POR_POST - 1} vezes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
   "perfil-ok": ["Briefing salvo! Agora a Scrull conhece a sua marca.", true],
   "perfil-erro": ["Não foi possível salvar o briefing. Tente de novo.", false],
@@ -123,6 +125,9 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
   const briefing = lerBriefing(cliente?.briefing);
   const briefingPreenchido = Object.keys(briefing).length > 0;
   const assinante = cliente?.assinatura === "ativa";
+  // Teste grátis: quem não assinou publica DIAS_GRATIS posts no próprio Instagram
+  const teste = assinante ? { emTeste: false, restam: 0 } : await situacaoDoTeste(user.id).catch(() => ({ emTeste: false, restam: 0 }));
+  const podePublicar = assinante || (teste.emTeste && teste.restam > 0);
   const quando = (iso: string) =>
     new Date(iso).toLocaleString("pt-BR", {
       weekday: "short", day: "2-digit", month: "2-digit",
@@ -133,7 +138,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
 
   const temFuturos = (posts ?? []).some((p) => p.status !== "recusado" && new Date(p.agendado_para).getTime() > agoraMs);
   // Situação real de cada post e filtros (status + período)
-  const ctx = { assinante, pausado: !!cfg?.pausado, temConta: !!conta, agora: agoraMs };
+  const ctx = { assinante: podePublicar, pausado: !!cfg?.pausado, temConta: !!conta, agora: agoraMs };
   const comSit = (posts ?? []).map((p) => ({ p, sit: situacao(p, ctx) }));
   const contagem = Object.fromEntries((Object.keys(FILTROS) as Filtro[]).map((f) => [f, comSit.filter((x) => passaNoFiltro(x.sit, f)).length]));
   const noPeriodo = (iso: string) => {
@@ -186,7 +191,10 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
           <div>
             <h1>Olá, {cliente?.nome_empresa ?? "bem-vinda"}!</h1>
             <p className="sub">
-              {assinante ? "Sua assinatura está ativa." : `Demonstração grátis: crie sua primeira semana de posts e veja ${ARTES_DEMO} artes. Assine para publicar.`}
+              {assinante ? "Sua assinatura está ativa."
+                : teste.emTeste && teste.restam > 0
+                  ? `Teste grátis: a Scrull cria e publica ${DIAS_GRATIS} posts no seu Instagram, um por dia${teste.restam < DIAS_GRATIS ? ` (faltam ${teste.restam})` : ""}. Depois, assine para continuar no automático.`
+                  : "Seu teste grátis terminou. Assine para a Scrull continuar criando e publicando por você."}
             </p>
           </div>
         </div>
@@ -300,7 +308,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
         {cliente?.ramo && (
           <div className="acoes" style={{ marginBottom: 14 }}>
             {!temFuturos ? (
-              <form action={gerarSemana}><Botao className="btn">{assinante ? "Criar posts da semana" : "Criar minha semana grátis"}</Botao></form>
+              <form action={gerarSemana}><Botao className="btn">{assinante ? "Criar posts da semana" : `Criar meus ${DIAS_GRATIS} dias grátis`}</Botao></form>
             ) : assinante ? (
               <form action={refazerSemana}>
                 <Botao className="btn ghost">Refazer a semana</Botao>
@@ -392,7 +400,7 @@ export default async function Painel({ searchParams }: { searchParams: Promise<B
           <div className="card"><p style={{ margin: 0 }} className="sub">Nenhuma publicação {calendario ? "neste dia" : "com este filtro"}.</p></div>
         ) : (
           mostrados.map(({ p, sit }) => (
-            <CartaoPost key={p.id} post={p} sit={sit} perfil={conta?.ig_username ?? undefined} assinante={assinante} temConta={!!conta}
+            <CartaoPost key={p.id} post={p} sit={sit} perfil={conta?.ig_username ?? undefined} assinante={podePublicar} temConta={!!conta}
               facebook={!!paginaFb && (cfg?.publicar_facebook ?? true)} vista={vista}
               historico={((hist ?? []) as Historico[]).filter((h) => h.post_id === p.id)}
               artes={{ usadasNoPost: artes.porPost[p.id] ?? 0, porPost: ARTES_POR_POST, noMes: artes.noMes, limiteMes,

@@ -100,7 +100,8 @@ export async function guardarArquivo(caminho: string, bytes: Buffer | ArrayBuffe
 export const ARTES_POR_POST = Number(process.env.LIMITE_ARTES_POR_POST ?? 3);
 const ARTES_POR_POST_NO_MES = 2;
 // Quem ainda não assinou (demonstração) pode criar só estas artes, no total
-export const ARTES_DEMO = Number(process.env.LIMITE_ARTES_DEMO ?? 2);
+// (uma por dia do teste grátis + 1 troca)
+export const ARTES_DEMO = Number(process.env.LIMITE_ARTES_DEMO ?? Number(process.env.DIAS_GRATIS ?? 3) + 1);
 
 export class LimiteDeArtes extends Error {}
 

@@ -4,7 +4,7 @@ import "./inicio.css";
 export const metadata: Metadata = {
   title: "Scrull AI — Seu Instagram no automático",
   description:
-    "O Scrull AI cria os posts do seu negócio, agenda nos melhores horários e publica todos os dias. Crie sua primeira semana de posts grátis.",
+    "O Scrull AI cria os posts do seu negócio, agenda nos melhores horários e publica todos os dias. Teste grátis por 3 dias: a Scrull publica no seu Instagram.",
 };
 
 const CADASTRO = "/login?aba=cadastro";
@@ -28,7 +28,7 @@ const DUVIDAS = [
   ["E se eu não gostar de um post?", "Você escolhe: pode aprovar cada post antes de ir ao ar, editar a legenda ou pedir outra arte. Quem prefere não ter trabalho nenhum deixa tudo no automático."],
   ["Tem fidelidade?", "Não. A assinatura é mensal e você cancela quando quiser."],
   ["Como eu pago?", "Pelo cartão de crédito, com cobrança mensal automática pelo Mercado Pago. É seguro e o Scrull não vê os dados do seu cartão."],
-  ["A demonstração é grátis mesmo?", "É. Você cria a sua primeira semana de posts sem pagar nada. Só assina se quiser que a Scrull publique para você."],
+  ["O teste é grátis mesmo?", "É. Por 3 dias a Scrull cria e publica um post por dia no seu Instagram, sem cartão. Gostou? Assine para continuar no automático."],
 ];
 
 export default function Inicio() {
@@ -38,7 +38,7 @@ export default function Inicio() {
         <div className="lp-logo">SCRULL<i>AI</i></div>
         <nav>
           <a href="/login" className="lp-link">Entrar</a>
-          <a href={CADASTRO} className="lp-btn sm">Testar grátis</a>
+          <a href={CADASTRO} className="lp-btn sm">Testar 3 dias grátis</a>
         </nav>
       </header>
 
@@ -49,8 +49,8 @@ export default function Inicio() {
           A Scrull AI cria os posts do seu negócio, agenda nos melhores horários e publica todos os dias.
           Você aparece, é lembrado e segue cuidando do que importa.
         </p>
-        <a href={CADASTRO} className="lp-btn">Criar minha semana de posts grátis</a>
-        <p className="lp-mini">Demonstração grátis. Leva 2 minutos.</p>
+        <a href={CADASTRO} className="lp-btn">Testar 3 dias grátis</a>
+        <p className="lp-mini">3 dias grátis, sem cartão. Leva 2 minutos.</p>
       </section>
 
       <section className="lp-sec">
@@ -76,7 +76,7 @@ export default function Inicio() {
 
       <section className="lp-sec" id="planos">
         <h2>Planos</h2>
-        <p className="lp-sub2">Comece pela demonstração grátis. Assine só se quiser a Scrull postando por você.</p>
+        <p className="lp-sub2">Comece com 3 dias grátis no seu Instagram. Assine só se quiser continuar.</p>
         <div className="lp-planos">
           <div className="lp-plano">
             <span className="lp-tag cinza">Para começar</span>
@@ -89,7 +89,7 @@ export default function Inicio() {
               <li>Você aprova antes, ou deixa no automático</li>
               <li>Sem fidelidade: cancele quando quiser</li>
             </ul>
-            <a href={CADASTRO} className="lp-btn contorno">Começar pela demonstração grátis</a>
+            <a href={CADASTRO} className="lp-btn contorno">Começar com 3 dias grátis</a>
           </div>
           <div className="lp-plano destaque">
             <span className="lp-tag">Preço de lançamento</span>
@@ -102,7 +102,7 @@ export default function Inicio() {
               <li>Você aprova antes, ou deixa no automático</li>
               <li>Sem fidelidade: cancele quando quiser</li>
             </ul>
-            <a href={CADASTRO} className="lp-btn">Começar pela demonstração grátis</a>
+            <a href={CADASTRO} className="lp-btn">Começar com 3 dias grátis</a>
           </div>
           <div className="lp-plano">
             <span className="lp-tag cinza">Em breve</span>
@@ -132,7 +132,7 @@ export default function Inicio() {
 
       <section className="lp-final">
         <h2>Veja a sua primeira semana de posts pronta em minutos.</h2>
-        <a href={CADASTRO} className="lp-btn claro">Criar minha semana grátis</a>
+        <a href={CADASTRO} className="lp-btn claro">Testar 3 dias grátis</a>
       </section>
 
       <footer className="lp-rodape">

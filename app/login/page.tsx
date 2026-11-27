@@ -201,7 +201,7 @@ export default function Login() {
             )}
 
             <div className="sl-trust">
-              <div className="sl-trust-item"><div className="sl-dot" /> Demonstração grátis</div>
+              <div className="sl-trust-item"><div className="sl-dot" /> 3 dias grátis</div>
               <div className="sl-trust-item"><div className="sl-dot" /> Cancele quando quiser</div>
             </div>
           </div>

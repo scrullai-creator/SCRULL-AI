@@ -8,6 +8,7 @@ import { lerPerfil, resumoDoPerfil } from "@/lib/instagram-leitura";
 import { CAMPOS_BRIEFING, lerBriefing, type Briefing } from "@/lib/briefing";
 import { gerarArteDoPost, guardarArquivo, LimiteDeArtes } from "@/lib/imagem";
 import { publicarPost, PostOcupado } from "@/lib/publicar";
+import { DIAS_GRATIS, TesteEncerrado } from "@/lib/teste-gratis";
 import { registrar } from "@/lib/historico";
 import { criarAssinatura, cancelarAssinatura, pagamentoConfigurado } from "@/lib/mercadopago";
 
@@ -98,7 +99,8 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
     db.from("posts").select("titulo_arte, tema, layout").eq("cliente_id", userId)
       .neq("status", "recusado").order("criado_em", { ascending: false }).limit(20),
   ]);
-  const qtd = plano?.posts_por_semana ?? 7;
+  // Teste grátis: só DIAS_GRATIS posts (um por dia), para controlar o custo
+  const qtd = cliente.assinatura === "ativa" ? plano?.posts_por_semana ?? 7 : DIAS_GRATIS;
   // Lê o Instagram do cliente (se conectado) para manter a voz da marca e aprender com o que funciona
   const perfil = await lerPerfil(userId);
   const fotosDoPerfil = perfil.filter((p) => p.imagem).slice(0, 6).map((p) => p.imagem!) ;
@@ -108,7 +110,7 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
     briefing: lerBriefing(cliente.briefing), temLogo: !!cliente.logo_url,
     historico: (recentes ?? []).map((p) => ({ titulo: p.titulo_arte ?? "", tema: p.tema, layout: p.layout })),
   });
-  const passo = qtd >= 7 ? 1 : 2;
+  const passo = qtd >= 7 || cliente.assinatura !== "ativa" ? 1 : 2;
   const status = cfg?.postar_sem_aprovacao ? "aprovado" : "aguardando_aprovacao";
   const { data: criados, error } = await db.from("posts").insert(
     lista.map((p, i) => ({
@@ -224,7 +226,8 @@ export async function publicarAgora(f: FormData) {
   try {
     const db = supabaseAdmin();
     const { data: c } = await db.from("clientes").select("assinatura").eq("id", user.id).single();
-    if (c?.assinatura !== "ativa") {
+    // Quem está no teste grátis também publica (o limite do teste é conferido dentro de publicarPost)
+    if (c?.assinatura !== "ativa" && c?.assinatura !== "teste") {
       resultado = "pub-assine";
     } else if (f.get("confirmado") !== "sim") {
       resultado = "pub-confirmar";
@@ -234,6 +237,7 @@ export async function publicarAgora(f: FormData) {
     }
   } catch (e) {
     if (e instanceof PostOcupado) resultado = "pub-ocupado";
+    else if (e instanceof TesteEncerrado) resultado = "teste-fim";
     else console.error("Erro ao publicar:", e);
   }
   revalidatePath("/painel");

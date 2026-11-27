@@ -4,6 +4,7 @@ import { supabaseAdmin } from "./supabase";
 import { decifrar } from "./crypto";
 import { publicarNaPagina } from "./facebook";
 import { registrar, type Quem } from "./historico";
+import { situacaoDoTeste, TesteEncerrado, DIAS_GRATIS } from "./teste-gratis";
 
 const GRAPH = "https://graph.facebook.com/v27.0";
 
@@ -38,6 +39,15 @@ export async function publicarPost(postId: string, clienteId: string, quem: Quem
   if (post.status === "publicando") throw new PostOcupado("Este post já está sendo publicado");
   if (!PODE_PUBLICAR.includes(post.status)) throw new Error("Post recusado: aprove antes de publicar");
   if (!post.imagem_url) throw new Error("Crie a arte antes de publicar");
+
+  // Quem não assinou só publica dentro do teste grátis (DIAS_GRATIS posts por conta do Instagram)
+  const { data: cli } = await db.from("clientes").select("assinatura").eq("id", clienteId).single();
+  if (cli?.assinatura !== "ativa") {
+    const teste = await situacaoDoTeste(clienteId);
+    if (!teste.emTeste || teste.restam <= 0) {
+      throw new TesteEncerrado(`Seu teste grátis de ${DIAS_GRATIS} dias terminou. Assine para a Scrull continuar publicando por você.`);
+    }
+  }
 
   // Trava: só um processo passa daqui. Sem a migração 11 (status "publicando" não existe), segue sem trava.
   const trava = await db.from("posts").update({ status: "publicando", publicando_desde: new Date().toISOString(), erro_msg: null })

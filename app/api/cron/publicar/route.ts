@@ -8,6 +8,7 @@ import { publicarPost, PostOcupado } from "@/lib/publicar";
 import { registrar } from "@/lib/historico";
 import { atualizarMetricas } from "@/lib/metricas";
 import { gerarArteDoPost } from "@/lib/imagem";
+import { TesteEncerrado } from "@/lib/teste-gratis";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ async function rodar(req: NextRequest) {
   const { data: fila, error } = await db.from("posts")
     .select("id, cliente_id, imagem_url, clientes!inner(assinatura), erro_msg")
     .eq("status", "aprovado")
-    .eq("clientes.assinatura", "ativa")
+    .in("clientes.assinatura", ["ativa", "teste"])
     .lte("agendado_para", agora.toISOString())
     .gte("agendado_para", limite.toISOString())
     .order("agendado_para")
@@ -70,6 +71,12 @@ async function rodar(req: NextRequest) {
     } catch (e) {
       const motivo = e instanceof Error ? e.message : "erro";
       if (e instanceof PostOcupado) { resultado.push({ id: p.id, ok: false, motivo }); continue; }
+      if (e instanceof TesteEncerrado) {
+        // Teste grátis acabou: o post volta para aprovado/parado com o aviso, sem gastar mais nada
+        await db.from("posts").update({ status: "erro", erro_msg: motivo.slice(0, 300) }).eq("id", p.id).neq("status", "publicado");
+        resultado.push({ id: p.id, ok: false, motivo });
+        continue;
+      }
       // Marca como erro para não tentar de novo a cada rodada; o cliente vê o motivo no painel
       // (a publicação já marca sozinha; aqui cobre a falha ao criar a arte)
       await db.from("posts").update({ status: "erro", erro_msg: motivo.slice(0, 300) }).eq("id", p.id).neq("status", "publicado");
@@ -86,7 +93,7 @@ async function rodar(req: NextRequest) {
       .select("id, cliente_id, clientes!inner(assinatura)")
       .in("status", ["aguardando_aprovacao", "aprovado"])
       .is("imagem_url", null)
-      .eq("clientes.assinatura", "ativa")
+      .in("clientes.assinatura", ["ativa", "teste"])
       .gt("agendado_para", agora.toISOString())
       .lte("agendado_para", new Date(agora.getTime() + 3 * 86400000).toISOString())
       .order("agendado_para").limit(8);
