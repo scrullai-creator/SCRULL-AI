@@ -47,6 +47,7 @@ const AVISOS: Record<string, [string, boolean]> = {
   "assin-breve": ["A assinatura online estará disponível em breve. Fale com a gente para ativar o seu plano.", false],
   "cancel-ok": ["Assinatura cancelada. Seus posts ficam guardados caso você volte.", true],
   "cancel-erro": ["Não foi possível cancelar agora. Tente de novo em instantes.", false],
+  "demo-cheia": ["Muita gente testando hoje! A demonstração grátis está lotada por hoje. Tente amanhã ou fale com a gente.", false],
   "demo-usada": ["Sua semana grátis já foi criada. Assine para criar novas semanas, liberar todas as artes e publicar.", false],
   "img-limite": [`Limite de artes atingido: cada post pode ser trocado até ${ARTES_POR_POST - 1} vezes, e há um limite mensal no seu plano. Edite a legenda ou aprove uma das artes já criadas.`, false],
   "perfil-ok": ["Briefing salvo! Agora a Scrull conhece a sua marca.", true],

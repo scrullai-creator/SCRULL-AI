@@ -68,6 +68,15 @@ export async function sincronizarAssinatura(preapprovalId: string) {
 
   // Uma assinatura antiga cancelada não derruba a assinatura atual do cliente
   const ehAtual = !cliente.mp_assinatura_id || cliente.mp_assinatura_id === String(j.id);
+  // Segurança extra: a assinatura só ativa o plano se o valor cobrado for o preço do plano (ou mais)
+  if (situacao === "ativa" && planoId) {
+    const { data: plano } = await db.from("planos").select("preco_centavos").eq("id", planoId).single();
+    const cobrado = Math.round(Number(j.auto_recurring?.transaction_amount ?? 0) * 100);
+    if (!plano || cobrado < plano.preco_centavos) {
+      console.error("Assinatura com valor diferente do plano, não ativada:", String(j.id), cobrado, plano?.preco_centavos);
+      return { clienteId, status: String(j.status), situacao: null };
+    }
+  }
   if (situacao === "ativa") {
     await db.from("clientes").update({ assinatura: "ativa", mp_assinatura_id: String(j.id), ...(planoId && { plano_id: planoId }) }).eq("id", clienteId);
   } else if (situacao && ehAtual) {

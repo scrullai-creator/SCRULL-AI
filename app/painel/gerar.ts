@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import sharp from "sharp";
 import { redirect } from "next/navigation";
 import { supabaseDoUsuario, supabaseAdmin } from "@/lib/supabase";
 import { criarPosts, reescreverLegenda } from "@/lib/gerar-posts";
@@ -45,9 +46,12 @@ export async function salvarPerfil(f: FormData) {
   // Logo: PNG ou JPG até 2 MB, guardada na pasta pública
   const logo = f.get("logo");
   if (logo instanceof File && logo.size > 0) {
-    const tipo = logo.type === "image/png" ? "png" : logo.type === "image/jpeg" ? "jpg" : null;
-    if (tipo && logo.size <= 2 * 1024 * 1024) {
-      const url = await guardarArquivo(`${user.id}/logo.${tipo}`, await logo.arrayBuffer(), logo.type);
+    // Confere o conteúdo real do arquivo (não só o tipo que o navegador informa): só PNG ou JPG de verdade
+    const bytes = Buffer.from(await logo.arrayBuffer());
+    const formato = logo.size <= 2 * 1024 * 1024 ? await sharp(bytes).metadata().then((m) => m.format).catch(() => null) : null;
+    const tipo = formato === "png" ? "png" : formato === "jpeg" ? "jpg" : null;
+    if (tipo) {
+      const url = await guardarArquivo(`${user.id}/logo.${tipo}`, bytes, tipo === "png" ? "image/png" : "image/jpeg");
       dados.logo_url = `${url}?v=${Date.now()}`;
     }
   }
@@ -71,6 +75,15 @@ async function gerar(userId: string, db = supabaseAdmin()): Promise<string> {
   if (cliente.assinatura !== "ativa") {
     const { count: jaCriou } = await db.from("posts").select("id", { count: "exact", head: true }).eq("cliente_id", userId);
     if ((jaCriou ?? 0) > 0) return "demo-usada";
+    // Proteção do saldo das IAs: no máximo DEMOS_POR_DIA demonstrações novas por dia no app todo
+    // (evita alguém criar várias contas falsas só para gastar créditos)
+    const limiteDia = Number(process.env.DEMOS_POR_DIA ?? 20);
+    const { data: demos } = await db.from("posts").select("cliente_id, clientes!inner(assinatura)")
+      .neq("clientes.assinatura", "ativa").gte("criado_em", new Date(Date.now() - 86400000).toISOString()).limit(5000);
+    if (new Set((demos ?? []).map((d) => d.cliente_id)).size >= limiteDia) {
+      console.error("Limite diário de demonstrações atingido:", limiteDia);
+      return "demo-cheia";
+    }
   }
 
   // Economia: no máximo uma geração a cada 12 horas por cliente (posts recusados não contam)

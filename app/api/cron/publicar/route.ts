@@ -2,6 +2,7 @@
 // Publica os posts APROVADOS cuja hora já chegou, de clientes com assinatura ativa
 // e sem "Pausar publicações" ligado. Se o post ainda não tem arte, cria antes.
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase";
 import { publicarPost, PostOcupado } from "@/lib/publicar";
 import { registrar } from "@/lib/historico";
@@ -16,7 +17,9 @@ const ATRASO_MAXIMO_H = 24;    // não publica post que passou da hora há mais 
 
 async function rodar(req: NextRequest) {
   const segredo = process.env.CRON_SECRET;
-  if (!segredo || req.headers.get("authorization") !== `Bearer ${segredo}`) {
+  const recebido = Buffer.from(req.headers.get("authorization") ?? "");
+  const esperado = Buffer.from(`Bearer ${segredo ?? ""}`);
+  if (!segredo || recebido.length !== esperado.length || !timingSafeEqual(recebido, esperado)) {
     return NextResponse.json({ erro: "não autorizado" }, { status: 401 });
   }
 
